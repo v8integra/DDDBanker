@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { openAccount } from '../accounts/accounts';
+import { issueDebitCard } from '../banking/cards';
 import { hashPassword } from '../auth/passwords';
 import type { Db } from '../db';
 import { isUniqueViolation } from '../db';
@@ -30,6 +31,7 @@ export async function registerUser(
         data: { email: input.email, passwordHash, name: input.name, creditScore, createdAt: at },
       });
       const checking = await openAccount(tx, { userId: user.id, type: 'CHECKING', at });
+      await issueDebitCard(tx, checking.id, at);
       await openAccount(tx, { userId: user.id, type: 'SAVINGS', at });
 
       await postTransaction(tx, {

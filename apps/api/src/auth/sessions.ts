@@ -117,8 +117,14 @@ export async function destroySession(
   reply.clearCookie(config.sessionCookieName, { path: '/' });
 }
 
-export function toSessionInfo({ config, clock }: AppDeps, auth: AuthContext | null): SessionInfo {
+export async function toSessionInfo(
+  { config, clock, db }: AppDeps,
+  auth: AuthContext | null,
+): Promise<SessionInfo> {
   if (!auth) return { authenticated: false };
+  const unreadNotifications = await db.notification.count({
+    where: { userId: auth.user.id, readAt: null },
+  });
   const idle = minutesFrom(auth.lastSeenAt, config.SESSION_IDLE_MINUTES);
   return {
     authenticated: true,
@@ -127,5 +133,6 @@ export function toSessionInfo({ config, clock }: AppDeps, auth: AuthContext | nu
     idleExpiresAt: (idle < auth.expiresAt ? idle : auth.expiresAt).toISOString(),
     absoluteExpiresAt: auth.expiresAt.toISOString(),
     serverTime: clock.now().toISOString(),
+    unreadNotifications,
   };
 }

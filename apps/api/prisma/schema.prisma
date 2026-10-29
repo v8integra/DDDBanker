@@ -12,26 +12,33 @@ datasource db {
 }
 
 model User {
-  id               String    @id @default(cuid())
-  email            String    @unique
-  passwordHash     String
-  name             String
-  addressLine1     String?
-  city             String?
-  region           String?
-  postalCode       String?
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  name              String
+  addressLine1      String?
+  city              String?
+  region            String?
+  postalCode        String?
   /// Simulated credit score, assigned at signup (580-820).
-  creditScore      Int
-  failedLoginCount Int       @default(0)
-  lockedUntil      DateTime?
-  totpSecret       String?
-  createdAt        DateTime  @default(now())
+  creditScore       Int
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+  /// Confirmed two-step verification secret (base32). Null = 2FA off.
+  totpSecret        String?
+  /// Secret being set up, not yet confirmed with a code.
+  totpPendingSecret String?
+  createdAt         DateTime  @default(now())
 
   sessions           Session[]
   accounts           Account[]
   auditLogs          AuditLog[]
   idempotencyRecords IdempotencyRecord[]
   transactions       Transaction[]
+  payees             Payee[]
+  scheduledPayments  ScheduledPayment[]
+  supportTickets     SupportTicket[]
+  notifications      Notification[]
 }
 
 model Session {
@@ -84,9 +91,15 @@ model Account {
   interestRateBps Int           @default(0)
   /// Cached sum of this account's ledger entries, updated in the same DB transaction.
   balanceCents    BigInt        @default(0)
+  /// CDs only.
+  termMonths      Int?
+  maturesAt       DateTime?
   createdAt       DateTime      @default(now())
 
-  entries LedgerEntry[]
+  entries       LedgerEntry[]
+  cards         Card[]
+  scheduledFrom ScheduledPayment[] @relation("ScheduledFrom")
+  scheduledTo   ScheduledPayment[] @relation("ScheduledTo")
 
   @@index([userId])
 }
@@ -117,6 +130,8 @@ model Transaction {
   type              TransactionType
   description       String
   memo              String?
+  /// Where it happened: TELLER, ATM, ONLINE, CARD, SCHEDULED, SYSTEM. Used for channel limits.
+  channel           String?
   status            TransactionStatus @default(POSTED)
   initiatedByUserId String?
   initiatedBy       User?             @relation(fields: [initiatedByUserId], references: [id], onDelete: SetNull)
@@ -168,6 +183,124 @@ model AuditLog {
   metadata  String?
   ip        String?
   createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum CardType {
+  DEBIT
+  CREDIT
+}
+
+enum CardStatus {
+  ACTIVE
+  LOCKED
+  REPORTED_LOST
+  REPLACED
+}
+
+model Card {
+  id                 String     @id @default(cuid())
+  accountId          String
+  account            Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type               CardType
+  last4              String
+  expiryMonth        Int
+  expiryYear         Int
+  status             CardStatus @default(ACTIVE)
+  /// Most this card can spend in one bank day.
+  spendingLimitCents BigInt     @default(100000)
+  /// Set when this card was replaced: the id of the new card.
+  replacedById       String?
+  createdAt          DateTime   @default(now())
+
+  @@index([accountId])
+}
+
+model Payee {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  /// The account number at the biller (fictional).
+  accountRef String
+  createdAt  DateTime @default(now())
+
+  scheduledPayments ScheduledPayment[]
+
+  @@index([userId])
+}
+
+enum ScheduleFrequency {
+  ONCE
+  WEEKLY
+  MONTHLY
+}
+
+model ScheduledPayment {
+  id            String            @id @default(cuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccountId String
+  fromAccount   Account           @relation("ScheduledFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  /// Exactly one of payeeId / toAccountId is set.
+  payeeId       String?
+  payee         Payee?            @relation(fields: [payeeId], references: [id], onDelete: Cascade)
+  toAccountId   String?
+  toAccount     Account?          @relation("ScheduledTo", fields: [toAccountId], references: [id], onDelete: Cascade)
+  amountCents   BigInt
+  frequency     ScheduleFrequency
+  nextRunDate   DateTime
+  memo          String?
+  active        Boolean           @default(true)
+  lastRunAt     DateTime?
+  /// Outcome of the last run, e.g. POSTED or INSUFFICIENT_FUNDS.
+  lastResult    String?
+  createdAt     DateTime          @default(now())
+
+  @@index([active, nextRunDate])
+  @@index([userId])
+}
+
+enum TicketStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+model SupportTicket {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String
+  status    TicketStatus     @default(OPEN)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now())
+  messages  SupportMessage[]
+
+  @@index([userId])
+}
+
+model SupportMessage {
+  id        String        @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  /// CUSTOMER or STAFF.
+  author    String
+  body      String
+  createdAt DateTime      @default(now())
+
+  @@index([ticketId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
 }

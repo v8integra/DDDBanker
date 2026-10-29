@@ -26,6 +26,12 @@ export const loginSchema = z.object({
   email: emailSchema,
   // Login only checks length bounds so old passwords still work if the rules change.
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+  /** Only when the account has two-step verification on. */
+  totpCode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Enter the 6-digit code')
+    .optional(),
 });
 export type LoginInput = z.input<typeof loginSchema>;
 
@@ -46,4 +52,6 @@ export type SessionInfo =
       absoluteExpiresAt: string;
       /** Server's "now", so clients can time warnings without trusting their own clock. */
       serverTime: string;
+      /** Unread notifications, so the HUD bell can update without extending the session. */
+      unreadNotifications: number;
     };

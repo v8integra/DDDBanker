@@ -3,6 +3,7 @@ import { loginSchema, signupSchema, type SessionInfo } from '@dddbanker/shared';
 import { audit } from '../audit';
 import { requireAuth } from '../auth/guard';
 import { verifyAgainstDummy, verifyPassword } from '../auth/passwords';
+import { verifyTotp } from '../auth/totp';
 import { createSession, destroySession, resolveSession, toSessionInfo } from '../auth/sessions';
 import { minutesFrom } from '../clock';
 import type { AppDeps } from '../deps';
@@ -35,11 +36,11 @@ export function authRoutes(deps: AppDeps): FastifyPluginAsync {
       const user = await registerUser(db, input, { at: now });
       await audit(db, { userId: user.id, action: 'SIGNUP', ip: req.ip, at: now });
       const session = await createSession(deps, req, reply, user.id);
-      return reply.status(201).send(toSessionInfo(deps, session));
+      return reply.status(201).send(await toSessionInfo(deps, session));
     });
 
     app.post('/auth/login', { config: rateLimit.login }, async (req, reply) => {
-      const { email, password } = loginSchema.parse(req.body);
+      const { email, password, totpCode } = loginSchema.parse(req.body);
       const now = clock.now();
       const user = await db.user.findUnique({ where: { email } });
 
@@ -60,7 +61,8 @@ export function authRoutes(deps: AppDeps): FastifyPluginAsync {
         throw lockedError(user.lockedUntil, now);
       }
 
-      if (!(await verifyPassword(user.passwordHash, password))) {
+      /** Count a failed attempt toward lockout; throws the right error. */
+      const fail = async (reason: 'password' | 'totp'): Promise<never> => {
         const { failedLoginCount } = await db.user.update({
           where: { id: user.id },
           data: { failedLoginCount: { increment: 1 } },
@@ -69,7 +71,7 @@ export function authRoutes(deps: AppDeps): FastifyPluginAsync {
         await audit(db, {
           userId: user.id,
           action: 'LOGIN_FAILED',
-          metadata: { failedLoginCount },
+          metadata: { failedLoginCount, reason },
           ip: req.ip,
           at: now,
         });
@@ -81,7 +83,30 @@ export function authRoutes(deps: AppDeps): FastifyPluginAsync {
           });
           throw lockedError(lockedUntil, now);
         }
-        throw INVALID_CREDENTIALS;
+        throw reason === 'password'
+          ? INVALID_CREDENTIALS
+          : new AppError(
+              401,
+              'TWO_FACTOR_INVALID',
+              "That code didn't match. Codes change every 30 seconds, so try the current one.",
+              {
+                totpCode: "That code didn't match",
+              },
+            );
+      };
+
+      if (!(await verifyPassword(user.passwordHash, password))) await fail('password');
+
+      // Two-step verification: the password was right, now ask for the code.
+      if (user.totpSecret) {
+        if (!totpCode) {
+          throw new AppError(
+            401,
+            'TWO_FACTOR_REQUIRED',
+            'Enter the 6-digit code from your authenticator app.',
+          );
+        }
+        if (!verifyTotp(user.totpSecret, totpCode, now)) await fail('totp');
       }
 
       await db.user.update({

@@ -711,3 +711,55 @@ legend {
 .dialogue-box__text p[aria-hidden='true'] {
   min-height: 1.5em;
 }
+
+.field textarea {
+  min-height: 96px;
+  padding: 8px 12px;
+  border: 3px solid var(--window-border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  color: var(--field-text);
+  font: 1rem/1.4 var(--font-body);
+  resize: vertical;
+}
+.secret-code {
+  display: block;
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  font:
+    700 1.1rem ui-monospace,
+    monospace;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+  user-select: all;
+}
+.hud-button__badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 22px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 2px solid var(--window-border);
+  background: #e05d4f;
+  color: #fff;
+  font: 700 0.75rem var(--font-body);
+}
+.hud-button {
+  position: relative;
+}
+
+/* Tables get a wider window; text wraps, numbers don't. */
+.retro-window--wide {
+  width: min(760px, calc(100% - 32px));
+}
+.retro-table th,
+.retro-table td {
+  white-space: normal;
+}
+.retro-table .cell--end,
+.retro-table .money {
+  white-space: nowrap;
+}

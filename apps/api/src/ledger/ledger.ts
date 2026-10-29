@@ -14,6 +14,8 @@ export interface PostInput {
   type: TransactionType;
   description: string;
   memo?: string | undefined;
+  /** TELLER, ATM, ONLINE, CARD, SCHEDULED, SYSTEM. */
+  channel?: string;
   initiatedByUserId?: string | null;
   at: Date;
   entries: EntryInput[];
@@ -45,6 +47,7 @@ export async function postTransaction(tx: Tx, input: PostInput): Promise<string>
       type: input.type,
       description: input.description,
       memo: input.memo ?? null,
+      channel: input.channel ?? null,
       initiatedByUserId: input.initiatedByUserId ?? null,
       status: 'POSTED',
       createdAt: input.at,

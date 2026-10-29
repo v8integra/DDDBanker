@@ -1,7 +1,27 @@
 import type { Db, Tx } from './db';
 
 export type AuditAction =
-  'SIGNUP' | 'LOGIN' | 'LOGIN_FAILED' | 'LOGIN_LOCKED' | 'LOGOUT' | 'ACCOUNT_RENAMED' | 'TRANSFER';
+  | 'SIGNUP'
+  | 'LOGIN'
+  | 'LOGIN_FAILED'
+  | 'LOGIN_LOCKED'
+  | 'LOGOUT'
+  | 'ACCOUNT_RENAMED'
+  | 'ACCOUNT_OPENED'
+  | 'TRANSFER'
+  | 'DEPOSIT'
+  | 'WITHDRAWAL'
+  | 'P2P'
+  | 'BILL_PAY'
+  | 'PAYEE_ADDED'
+  | 'PAYEE_REMOVED'
+  | 'SCHEDULED_PAYMENT'
+  | 'CARD_STATUS'
+  | 'CARD_PURCHASE'
+  | 'PASSWORD_CHANGED'
+  | 'TWO_FACTOR_ENABLED'
+  | 'TWO_FACTOR_DISABLED'
+  | 'SESSION_REVOKED';
 
 export interface AuditInput {
   userId: string | null;

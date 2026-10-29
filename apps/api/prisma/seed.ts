@@ -2,9 +2,12 @@
  * Demo data so every station has something to show. Safe to re-run: it does
  * nothing if the demo user already exists. For a clean slate: npm run db:reset.
  *
- * Phase 5/6 will add a credit card with history, an auto loan mid-term, and payees.
+ * Also tops up older databases (debit cards, payees) when re-run. Phase 6 adds a
+ * credit card with history and an auto loan mid-term.
  */
 import { BANK } from '@dddbanker/shared';
+import { demoPurchase, issueDebitCard } from '../src/banking/cards';
+import { addPayee, createScheduledPayment, payBill } from '../src/banking/payments';
 import { createDb } from '../src/db';
 import { postTransaction } from '../src/ledger/ledger';
 import { getSystemAccountId } from '../src/ledger/system-accounts';
@@ -77,7 +80,72 @@ async function seedUser({ email, name, creditScore }: (typeof DEMO_USERS)[number
   console.log(`  ${email} created`);
 }
 
+/** Every checking account gets a debit card (accounts opened before Phase 5 had none). */
+async function backfillCards() {
+  const bare = await db.account.findMany({ where: { type: 'CHECKING', cards: { none: {} } } });
+  for (const account of bare)
+    await db.$transaction((tx) => issueDebitCard(tx, account.id, new Date()));
+  if (bare.length) console.log(`  issued ${bare.length} debit card(s)`);
+}
+
+/** Payees, a bill, a scheduled payment and some card purchases, once per demo customer. */
+async function seedBanking(email: string) {
+  const user = await db.user.findUniqueOrThrow({ where: { email }, include: { accounts: true } });
+  if (await db.payee.count({ where: { userId: user.id } })) return;
+  const checking = user.accounts.find((a) => a.type === 'CHECKING')!;
+  const [power, rent] = await Promise.all([
+    addPayee(
+      db,
+      user.id,
+      { name: 'Bramblewood Power & Light', accountRef: '4421-9903' },
+      daysAgo(20),
+    ),
+    addPayee(
+      db,
+      user.id,
+      { name: 'Mossy Oak Apartments', accountRef: 'UNIT 4B-1200' },
+      daysAgo(20),
+    ),
+  ]);
+  await db.$transaction((tx) =>
+    payBill(
+      tx,
+      user.id,
+      { payeeId: power.id, fromAccountId: checking.id, amountCents: 8_450 },
+      daysAgo(12),
+    ),
+  );
+  const card = await db.card.findFirstOrThrow({
+    where: { accountId: checking.id, status: 'ACTIVE' },
+  });
+  for (const [day, cents] of [
+    [10, 1_275],
+    [6, 4_380],
+    [3, 899],
+  ] as const) {
+    await db.$transaction((tx) => demoPurchase(tx, user.id, card.id, cents, daysAgo(day)));
+  }
+  const nextMonth = new Date();
+  nextMonth.setUTCDate(1);
+  nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  await createScheduledPayment(
+    db,
+    user.id,
+    {
+      fromAccountId: checking.id,
+      payeeId: rent.id,
+      amountCents: 95_000,
+      frequency: 'MONTHLY',
+      startDate: nextMonth.toISOString().slice(0, 10),
+    },
+    new Date(),
+  );
+  console.log(`  ${email}: payees, bills, card purchases, and a scheduled rent payment`);
+}
+
 console.log('Seeding demo customers…');
 for (const user of DEMO_USERS) await seedUser(user);
+await backfillCards();
+for (const user of DEMO_USERS) await seedBanking(user.email);
 console.log(`Done. Sign in with any demo email and password "${DEMO_PASSWORD}".`);
 await db.$disconnect();

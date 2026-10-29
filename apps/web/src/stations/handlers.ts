@@ -5,18 +5,18 @@ import {
   signupSchema,
   type AccountSummary,
 } from '@dddbanker/shared';
-import type { ApiClient } from '../api/client';
-import type { SessionWatcher } from '../auth/sessionWatcher';
+import { ApiRequestError } from '../api/client';
 import { NO_ERRORS, errorsFromZod, type FormErrors } from '../ui/windows/formErrors';
 import { balanceCell } from '../ui/windows/money';
-import type { Windows } from '../ui/windows/windows';
+import { cardsDesk } from './banking/cards';
+import { helpDesk, notificationsWindow } from './banking/help';
+import { speakerOf, type BankContext } from './banking/kit';
+import { paymentsDesk } from './banking/payments';
+import { securityDesk } from './banking/security';
+import { openAccountFlow, showBalances, tellerDesk } from './banking/teller';
 import type { StationDef } from './stations';
 
-export interface StationContext {
-  watcher: SessionWatcher;
-  api: ApiClient;
-  ui: Windows;
-}
+export type StationContext = BankContext;
 
 const soon = 'This window opens in an upcoming update of the bank.';
 
@@ -30,7 +30,7 @@ const ACCOUNT_TYPE_LABEL: Record<string, string> = {
   PERSONAL_LOAN: 'Personal loan',
 };
 
-/** What happens when you talk to each station. Phase 5+ fills in the rest. */
+/** What happens when you talk to each station. The lending and insurance desks arrive in Phase 6. */
 export async function runStation(def: StationDef, ctx: StationContext) {
   switch (def.id) {
     case 'checkin':
@@ -39,6 +39,20 @@ export async function runStation(def: StationDef, ctx: StationContext) {
       return newAccountsDesk(def, ctx);
     case 'exit':
       return checkOutDesk(def, ctx);
+    case 'teller':
+      return tellerDesk(def, ctx);
+    case 'transfers':
+      return paymentsDesk(def, ctx);
+    case 'cards':
+      return cardsDesk(def, ctx);
+    case 'security':
+      return securityDesk(def, ctx);
+    case 'help':
+      return helpDesk(def, ctx);
+    case 'savings':
+      return savingsDesk(def, ctx);
+    case 'notifications':
+      return notificationsWindow(ctx);
     default: {
       const staff = speakerOf(def);
       await ctx.ui.dialogue({
@@ -47,10 +61,6 @@ export async function runStation(def: StationDef, ctx: StationContext) {
       });
     }
   }
-}
-
-function speakerOf(def: StationDef) {
-  return { speaker: def.staff?.name ?? def.title, ...(def.staff ? { role: def.staff.role } : {}) };
 }
 
 function signedInName(ctx: StationContext) {
@@ -115,8 +125,13 @@ async function checkInDesk(def: StationDef, ctx: StationContext) {
 }
 
 /** Returns true once signed in. */
-async function logInForm(ctx: StationContext) {
-  const result = await ctx.ui.form({
+/**
+ * The check-in form (shared with the ATM). If two-step verification is on,
+ * a second window asks for the code. Returns true once signed in.
+ */
+export async function logInForm(ctx: StationContext) {
+  let pending: { email: string; password: string } | null = null;
+  const result = await ctx.ui.form<boolean | 'needs-code'>({
     title: 'Check In',
     notice: BANK.disclaimer,
     fields: [
@@ -132,12 +147,74 @@ async function logInForm(ctx: StationContext) {
       return errors;
     },
     submit: async (values) => {
-      const session = await ctx.api.login({ email: values.email!, password: values.password! });
+      const credentials = { email: values.email!, password: values.password! };
+      try {
+        const session = await ctx.api.login(credentials);
+        ctx.watcher.apply(session);
+        return session.authenticated;
+      } catch (err) {
+        if (err instanceof ApiRequestError && err.body?.error === 'TWO_FACTOR_REQUIRED') {
+          pending = credentials;
+          return 'needs-code';
+        }
+        throw err;
+      }
+    },
+  });
+  if (result !== 'needs-code' || !pending) return result === true;
+  return twoFactorForm(ctx, pending);
+}
+
+async function twoFactorForm(
+  ctx: StationContext,
+  credentials: { email: string; password: string },
+) {
+  const result = await ctx.ui.form({
+    title: 'Two-Step Verification',
+    intro: ['Open your authenticator app and enter the 6-digit code for the Bank of Bramblewood.'],
+    fields: [
+      { name: 'totpCode', label: '6-digit code', type: 'code', autocomplete: 'one-time-code' },
+    ],
+    submitLabel: 'Check in',
+    validate: (values) => {
+      const errors = { fields: {} as Record<string, string>, form: null };
+      if (!/^\d{6}$/.test((values.totpCode ?? '').trim()))
+        errors.fields.totpCode = 'Enter the 6-digit code';
+      return errors;
+    },
+    submit: async (values) => {
+      const session = await ctx.api.login({ ...credentials, totpCode: values.totpCode!.trim() });
       ctx.watcher.apply(session);
       return session.authenticated;
     },
   });
   return result === true;
+}
+
+// ---------- Savings & Investments ----------
+
+async function savingsDesk(def: StationDef, ctx: StationContext) {
+  const staff = speakerOf(def);
+  for (;;) {
+    const choice = await ctx.ui.dialogue<'open' | 'mine' | 'bye'>({
+      ...staff,
+      lines: [def.greeting],
+      choices: [
+        { value: 'open', label: 'Open a savings account or CD' },
+        { value: 'mine', label: 'My savings and CDs' },
+        { value: 'bye', label: 'Just looking!' },
+      ],
+    });
+    if (!choice || choice === 'bye') return;
+    const accounts = await ctx.api.getAccounts().catch(() => null);
+    if (!accounts) return;
+    if (choice === 'open') await openAccountFlow(ctx, accounts);
+    if (choice === 'mine')
+      await showBalances(
+        ctx,
+        accounts.filter((a) => a.type === 'SAVINGS' || a.type === 'CD'),
+      );
+  }
 }
 
 // ---------- New Accounts: sign up ----------

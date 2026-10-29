@@ -96,8 +96,15 @@ export class Client {
     this.request('POST', url, body ?? {}, headers);
   patch = (url: string, body: unknown) => this.request('PATCH', url, body);
 
+  del = (url: string) => this.request('DELETE', url);
+
   transfer(body: unknown, key: string = randomUUID()) {
     return this.post('/transfers', body, { [IDEMPOTENCY_HEADER]: key });
+  }
+
+  /** Any money-moving POST, with a fresh Idempotency-Key unless one is given. */
+  money(url: string, body: unknown, key: string = randomUUID()) {
+    return this.post(url, body, { [IDEMPOTENCY_HEADER]: key });
   }
 }
 

@@ -12,6 +12,9 @@ import type { Level, Spawn } from '../levels/level';
 import { Character } from '../player/character';
 import { ClickMarker } from '../player/clickMarker';
 import type { SettingsStore } from '../settings/settings';
+import { useAtm } from '../stations/banking/atm';
+import { notificationsWindow } from '../stations/banking/help';
+import type { BankContext } from '../stations/banking/kit';
 import { infoBoardLines, runStation } from '../stations/handlers';
 import { interior } from '../theme';
 import { DialogStack } from '../ui/dialogs';
@@ -45,6 +48,8 @@ export class Game {
   private readonly prompt: InteractPrompt;
   private readonly fade: Fade;
   private readonly ui: Windows;
+  /** What station flows get: session, API, windows. */
+  private readonly bank: BankContext;
   private readonly marker = new ClickMarker();
   private readonly raycaster = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
@@ -69,7 +74,11 @@ export class Game {
     this.character = new Character({ color: store.get().playerColor });
     this.input = new Input(canvas);
     const menus = createMenus(store, this.dialogs, uiRoot);
-    this.hud = new Hud({ onMenu: menus.openPause, onHelp: menus.openHelp });
+    this.hud = new Hud({
+      onMenu: menus.openPause,
+      onHelp: menus.openHelp,
+      onBell: () => void notificationsWindow(this.bank),
+    });
     uiRoot.prepend(this.hud.root);
     this.prompt = new InteractPrompt(
       (m) => this.hud.announce(m),
@@ -78,6 +87,7 @@ export class Game {
     uiRoot.append(this.prompt.el);
     this.fade = new Fade(uiRoot);
     this.ui = new Windows(this.dialogs, uiRoot, () => this.store.get().reducedMotion);
+    this.bank = { watcher, api, ui: this.ui, openControls: menus.openHelp };
     installMenuKeys();
     new TimeoutWarning(watcher, this.dialogs, uiRoot);
 
@@ -91,13 +101,7 @@ export class Game {
   async start() {
     this.exterior = await buildExteriorLevel(this.character, this.camera, {
       enterBank: () => void this.enterBank(),
-      useAtm: () =>
-        void this.say({
-          speaker: 'ATM',
-          lines: [
-            'The screen reads: "Out of service while we finish installing me. Try the teller inside!"',
-          ],
-        }),
+      useAtm: () => void useAtm(this.bank),
       readPlaque: () =>
         void this.say({
           speaker: 'Welcome sign',
@@ -371,7 +375,7 @@ export class Game {
     }
     this.setBusy(false);
     try {
-      await runStation(station.def, { watcher: this.watcher, api: this.api, ui: this.ui });
+      await runStation(station.def, this.bank);
     } finally {
       npc?.resetFacing();
     }

@@ -12,7 +12,23 @@ export class Hud {
   private readonly announcer: HTMLElement;
   private readonly hint: HTMLElement;
 
-  constructor(handlers: { onMenu: () => void; onHelp: () => void }) {
+  private readonly bell: HTMLButtonElement;
+  private readonly badge: HTMLElement;
+
+  constructor(handlers: { onMenu: () => void; onHelp: () => void; onBell: () => void }) {
+    this.badge = h('span', { class: 'hud-button__badge', 'aria-hidden': 'true', hidden: true });
+    this.bell = h(
+      'button',
+      {
+        type: 'button',
+        class: 'hud-button',
+        hidden: true,
+        onclick: handlers.onBell,
+        'aria-label': 'Notices',
+      },
+      '🔔',
+      this.badge,
+    );
     this.location = h('span', { class: 'hud-chip__value' });
     this.status = h('span', { class: 'hud-chip__value' }, 'Checking…');
     this.announcer = h('div', { class: 'visually-hidden', 'aria-live': 'polite', role: 'status' });
@@ -59,6 +75,7 @@ export class Hud {
         h(
           'div',
           { class: 'hud-buttons' },
+          this.bell,
           h(
             'button',
             {
@@ -107,6 +124,12 @@ export class Hud {
 
   setSession(session: SessionInfo | null) {
     this.status.textContent = session?.authenticated ? session.user.name : 'Not checked in';
+    // The bell shows for checked-in customers, with a count of unread notices.
+    const unread = session?.authenticated ? session.unreadNotifications : 0;
+    this.bell.hidden = !session?.authenticated;
+    this.badge.hidden = unread === 0;
+    this.badge.textContent = unread > 9 ? '9+' : String(unread);
+    this.bell.setAttribute('aria-label', unread ? `Notices, ${unread} unread` : 'Notices');
   }
 
   /** Read a message to screen-reader users without moving focus. */

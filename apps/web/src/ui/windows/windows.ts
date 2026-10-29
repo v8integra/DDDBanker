@@ -21,7 +21,9 @@ export interface DialogueOptions<T extends string> {
 export interface FieldDef {
   name: string;
   label: string;
-  type: 'text' | 'email' | 'password' | 'money' | 'select';
+  type: 'text' | 'email' | 'password' | 'money' | 'select' | 'date' | 'code' | 'textarea';
+  /** Starting value. */
+  value?: string;
   autocomplete?: string;
   hint?: string;
   options?: { value: string; label: string }[];
@@ -36,6 +38,8 @@ export interface FormOptions<R> {
   /** Highlighted notice above the fields (the demo-bank disclaimer). */
   notice?: string;
   fields: FieldDef[];
+  /** Small print under the fields. */
+  footnote?: string;
   submitLabel: string;
   cancelLabel?: string;
   /** Client-side checks (shared Zod schemas). The server still has the final say. */
@@ -49,6 +53,14 @@ export interface TableColumn {
   align?: 'start' | 'end';
 }
 export type TableCell = string | MoneyCell;
+
+/**
+ * Throw from a form's `submit` to stop quietly with the form still open,
+ * e.g. when the person answers "No" on the confirmation that `submit` showed.
+ */
+export class FormCancelled extends Error {
+  override name = 'FormCancelled';
+}
 
 let idCounter = 0;
 const uid = (prefix: string) => `${prefix}-${++idCounter}`;
@@ -200,16 +212,17 @@ export class Windows {
     );
   }
 
-  /** A data table (accounts, transactions). */
-  async table(options: {
+  /** A data table (accounts, transactions). Ends with `choices` (default: Okay) and resolves with the pick. */
+  async table<T extends string = 'ok'>(options: {
     title: string;
     caption: string;
     columns: TableColumn[];
     rows: TableCell[][];
     empty?: string;
     note?: string;
-  }) {
-    await this.present<'ok'>((settle) => {
+    choices?: Choice<T>[];
+  }): Promise<T | null> {
+    return this.present<T>((settle) => {
       const align = (i: number) => (options.columns[i]?.align === 'end' ? 'cell--end' : '');
       const table = options.rows.length
         ? h(
@@ -250,11 +263,16 @@ export class Windows {
             ),
           )
         : h('p', { class: 'retro-text' }, options.empty ?? 'Nothing to show yet.');
-      return this.window(options.title, [
-        table,
-        options.note ? h('p', { class: 'retro-note' }, options.note) : null,
-        this.optionButtons([{ value: 'ok', label: 'Okay' }], settle),
-      ]);
+      return this.window(
+        options.title,
+        [
+          table,
+          options.note ? h('p', { class: 'retro-note' }, options.note) : null,
+          this.optionButtons(options.choices ?? [{ value: 'ok' as T, label: 'Okay' }], settle),
+        ],
+        undefined,
+        'retro-window--wide',
+      );
     });
   }
 
@@ -266,7 +284,7 @@ export class Windows {
   form<R>(options: FormOptions<R>): Promise<R | null> {
     return this.present<R>((settle) => {
       const formError = h('p', { class: 'form-error', role: 'alert', hidden: true });
-      const inputs = new Map<string, HTMLInputElement | HTMLSelectElement>();
+      const inputs = new Map<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>();
       const errorEls = new Map<string, HTMLElement>();
 
       const fieldNodes = options.fields.map((field, index) => {
@@ -276,19 +294,32 @@ export class Windows {
         const error = h('p', { class: 'field__error', id: errorId, hidden: true });
         errorEls.set(field.name, error);
 
-        let control: HTMLInputElement | HTMLSelectElement;
-        if (field.type === 'select') {
+        let control: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+        if (field.type === 'textarea') {
+          control = h('textarea', {
+            id,
+            name: field.name,
+            rows: '4',
+            ...(field.maxLength ? { maxlength: String(field.maxLength) } : {}),
+          });
+          if (field.value !== undefined) control.value = field.value;
+        } else if (field.type === 'select') {
           control = h(
             'select',
             { id, name: field.name },
             ...(field.options ?? []).map((o) => h('option', { value: o.value }, o.label)),
           );
+          if (field.value !== undefined) control.value = field.value;
         } else {
           control = h('input', {
             id,
             name: field.name,
-            type: field.type === 'money' ? 'text' : field.type,
+            type: field.type === 'money' || field.type === 'code' ? 'text' : field.type,
             ...(field.type === 'money' ? { inputmode: 'decimal', placeholder: '0.00' } : {}),
+            ...(field.type === 'code'
+              ? { inputmode: 'numeric', maxlength: '6', placeholder: '000000' }
+              : {}),
+            ...(field.value !== undefined ? { value: field.value } : {}),
             ...(field.autocomplete ? { autocomplete: field.autocomplete } : {}),
             ...(field.maxLength ? { maxlength: String(field.maxLength) } : {}),
             spellcheck: 'false',
@@ -362,6 +393,7 @@ export class Windows {
           : null,
         formError,
         ...fieldNodes,
+        options.footnote ? h('p', { class: 'retro-note' }, options.footnote) : null,
         h(
           'div',
           { class: 'retro-actions' },
@@ -400,6 +432,7 @@ export class Windows {
             submitButton.disabled = false;
             submitButton.textContent = options.submitLabel;
             form.removeAttribute('aria-busy');
+            if (err instanceof FormCancelled) return; // "No, go back" on the confirm: stay put
             showErrors(
               err instanceof ApiRequestError
                 ? errorsFromApi(

@@ -9,6 +9,7 @@ const signedIn = (id: string, serverTime: string, idleExpiresAt: string): Sessio
   idleExpiresAt,
   absoluteExpiresAt: '2026-01-02T00:00:00Z',
   serverTime,
+  unreadNotifications: 0,
 });
 const out: SessionInfo = { authenticated: false };
 
