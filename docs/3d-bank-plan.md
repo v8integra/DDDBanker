@@ -274,13 +274,13 @@ Work in order. Each phase should end with something runnable and tests passing.
 - `npm run dev` starts api and web together on Windows.
 - Shared package with bank config (name, colors) and money helpers.
 
-### Phase 1 — Backend core
+### Phase 1 — Backend core ✅ (2026-10-29)
 - Prisma schema, migrations, seed script.
 - Auth (signup, login, logout, session, lockout, rate limits, CSRF).
 - Accounts, ledger, transactions, transfers with idempotency.
 - API tests for auth, authorization (user A cannot see user B), and ledger balancing.
 
-### Phase 2 — Exterior scene and character
+### Phase 2 — Exterior scene and character ✅ (2026-10-29)
 - Three.js scene, lighting, sidewalk/street/facade with bank name, props, boundaries.
 - Player character, controls, follow camera, Rapier collision, click-to-move.
 - Settings panel shell and pause menu.
@@ -351,3 +351,33 @@ Work in order. Each phase should end with something runnable and tests passing.
   - Dev ports: API `127.0.0.1:3001`, web `127.0.0.1:5173`, with Vite proxying `/api` so cookies are same-origin.
   - Planned for Phase 1: `db:migrate` / `db:seed` root scripts, and `@node-rs/argon2` (prebuilt Windows binaries) instead of `argon2`.
   - Toolchain at setup: Node 24, TypeScript 6, Vite 8, Vitest 5, Fastify 5, Zod 4, ESLint 10.
+- v0.3 (2026-10-29) — Phase 1 complete.
+  - **Prisma 7.10.1** (pinned; npm's `latest` tag pointed at an 8.0 RC) with the **libSQL driver adapter** for SQLite: it ships prebuilt Windows binaries, so no native build or install script is needed. Datasource URL lives in `apps/api/prisma.config.ts`. The generated client goes to `apps/api/src/generated/` (gitignored) and is rebuilt automatically before `dev`, `test`, `typecheck` and `db:seed`.
+  - **Money columns are `BigInt` cents.** `Account.balanceCents` is a cached balance updated in the same DB transaction as the ledger entries. Tests assert that it always equals the sum of the account's entries, that every transaction sums to zero, and that all balances (customers + system) sum to zero.
+  - **Debits use a conditional update** (`balance >= amount` checked in the same statement), so concurrent withdrawals can't overdraw. Customer checking, savings and CDs can't go negative; system, card and loan accounts can.
+  - `LedgerEntry` gained a per-side `description` ("Transfer to Savings" / "Transfer from Checking") and a `balanceAfterCents` running balance for history and statements. Entry ids are autoincrement so history paging is a simple cursor.
+  - System accounts are `Account` rows with `userId = null` and a `systemCode` (WELCOME_BONUS, CASH_VAULT, LOAN_FUNDING, INTEREST_EXPENSE, FEES_INCOME, EXTERNAL_CLEARING), created on first use. Account type `SYSTEM` added.
+  - **Idempotency moved to its own table** (`IdempotencyRecord`, unique per user + key) instead of a column on `Transaction`. It stores a hash of route + body and the response; the record commits in the same DB transaction as the money movement. Same key and same body replays the response (`Idempotent-Replayed: true`); same key with a different body returns 422. Only successes are stored, since a failed attempt moved nothing.
+  - **Sessions:** a random 256-bit cookie token, with only its SHA-256 stored. `httpOnly`, `SameSite=Strict`, `Secure` and the `__Host-` prefix in production. Rotated on login and signup. 15-minute idle and 12-hour absolute timeouts. `GET /auth/session` does **not** extend the idle timer (so the gate can poll it); `POST /auth/session/refresh` added for the timeout warning's "stay signed in".
+  - **CSRF:** per-session synchronizer token returned in the session info and required as `X-CSRF-Token` on every state-changing authenticated request. Login and signup rely on JSON-only bodies (the `text/plain` parser is removed, so cross-site forms get 415).
+  - **Lockout:** 5 failed logins locks check-in for 15 minutes (423). Unknown emails and wrong passwords get the same 401 and the same argon2 timing. Rate limits are per IP: login 10/min, signup 5/min, money 30/min. Signup with an existing email gets a vague 409.
+  - Passwords: argon2id (`@node-rs/argon2`, OWASP baseline 19 MiB / t=2), minimum 12 characters.
+  - Endpoints done: `POST /auth/signup|login|logout|session/refresh`, `GET /auth/session`, `GET /accounts`, `GET /accounts/:id`, `GET /accounts/:id/transactions?limit&before`, `PATCH /accounts/:id`, `POST /transfers`. Deferred to Phase 5: `POST /accounts` (opening savings or CDs), statements, P2P, deposits and withdrawals.
+  - A `Clock` is injected everywhere timestamps are made, so tests can move time. Phase 6's simulated bank clock builds on it.
+  - The API dev server uses `node --watch --import tsx` instead of `tsx watch`, which hung before starting when launched under `npm run` or `concurrently` on Windows.
+  - Seed: `demo@bramblewood.test` and `sam@bramblewood.test` / `bramblewood-demo-2026`, with payroll deposits and savings transfers over the past month. The card, loan and payee seed data come with Phases 5–6.
+- v0.4 (2026-10-29) — Phase 2 complete.
+  - **Three.js 0.186 + Rapier 0.21** (`@dimforge/rapier3d-compat`, WebAssembly embedded, no bundler plugin). Units are meters; +Z points from the street toward the bank door. All colors and dimensions live in `apps/web/src/theme.ts`.
+  - **Art:** everything is primitives with a shared 3-band `MeshToonMaterial` per color. Static scenery goes through a `StaticBatcher` that merges geometry per material, so the whole block is about 100 draw calls and about 33k triangles (144 fps in the dev browser). No external assets or CC0 packs yet, so there's no LICENSES file yet.
+  - **Bank name:** Three.js no longer ships sample fonts, so 3D signage uses a built-in 5×7 **block font** (`world/props/blockFont.ts`, A–Z, 0–9 and a little punctuation), with each sign drawn as one InstancedMesh. Small text (the welcome plaque) is a canvas texture. "Name on the side" became a vertical blade sign ("BANK") on the facade, since neighboring shops cover the bank's side walls.
+  - **Street:** sidewalks, curbs, a road with lane dashes and a zebra crossing, lamp posts, trees in planters, benches, a mailbox, flower planters, an outdoor ATM (a prop for now; it works in Phase 5), and neighboring shops (Bakery, Books, Flowers, Cafe). Bounds look natural: hedges with picket fences on the sidewalks, "road closed" barricades with cones across the street, and invisible walls just behind them.
+  - **Player:** a bean-shaped character (capsule body, head, cap, eyes, cheeks, arms, feet) with procedural walk, bob and lean, plus idle breathing. The Rapier kinematic character controller uses autostep (curbs and entrance steps) and snap-to-ground. Walk 4 m/s, run (Shift) 6.5 m/s. Character color is picked in Settings, with six options.
+  - **Camera:** third-person orbit (drag, Z/C keys, right stick), zoom (wheel, +/−). A raycast pulls the camera in when scenery is in the way. Fixed-camera option. Movement is camera-relative.
+  - **Click-to-move:** a short press without dragging counts as a click; a drag orbits the camera. It raycasts only the ground surfaces, clamps the target to the walkable bounds, shows a pulsing ring, and gives up if blocked for 0.6 s. Keyboard or stick input cancels it.
+  - **Gamepad:** left stick walks, right stick looks, A interacts, Start pauses, LB or stick-click runs. It's the standard mapping, untested on real hardware.
+  - **UI:** the HUD (location, check-in status from `GET /auth/session`, help and menu buttons, a polite live region, a first-run controls hint with touch wording on touch-only devices) is real HTML. Pause, Settings and Controls are native modal `<dialog>`s in a shared `DialogStack`, which handles focus containment, Escape, focus return, and pausing the game while any window is open. The retro window style lives in `style.css` and Phase 4 builds on it. Fonts are Press Start 2P for headings and Atkinson Hyperlegible for everything else (Google Fonts).
+  - **Settings (saved per browser, every field validated on load):** look sensitivity, invert Y, fixed camera, click-to-move, reduced motion (defaults from `prefers-reduced-motion`), text size 100/112.5/125/150%, readable-font toggle, high-contrast menus (defaults from `prefers-contrast`), graphics quality (pixel ratio and shadow map; touch phones default to Low), character color. Not built yet: remappable controls (Phase 7), volume (Phase 8, no sounds yet), colorblind palette (Phase 7).
+  - **`?debug`:** an FPS, draw call, triangle, position and camera readout; Rapier collider wireframes (F3 toggles them); `window.__game` for poking at the player, camera, physics and settings from the console.
+  - **Rendering pauses** while a menu is open (the last frame stays on screen). The frame time is clamped to 50 ms so tab switches don't cause big jumps.
+  - **Checked in the browser:** walking climbs both entrance steps and stops at the door; running stops at the hedge boundary; click-to-move arrives within 0.15 m; Escape → Tab → Enter opens Settings; settings apply live and persist; Reset updates the controls; two Escapes return focus to the game; no console errors at desktop or 375 px width.
+  - Production bundle is 5 MB raw / 1.8 MB gzip, mostly Rapier's embedded WebAssembly plus Three.js. Code-splitting and preloading are in Phase 8's performance pass.

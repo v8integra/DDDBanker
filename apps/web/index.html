@@ -2,16 +2,29 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Bank of Bramblewood, a fictional demo bank you visit as a small 3D world."
+    />
     <title>Bank of Bramblewood</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Press+Start+2P&display=swap"
+    />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <main id="app">
-      <h1 id="bank-name">Bank of Bramblewood</h1>
-      <p id="disclaimer"></p>
-      <p id="api-status" role="status" aria-live="polite">Checking the vault…</p>
-    </main>
+    <canvas
+      id="game"
+      tabindex="0"
+      aria-label="3D view of Bramblewood Street outside the bank. Use W A S D or the arrow keys to walk, and Escape for the menu."
+    ></canvas>
+    <div id="ui"></div>
+    <div id="loading" class="loading" role="status" aria-live="polite">Opening the doors…</div>
+    <noscript>The Bank of Bramblewood needs JavaScript to run.</noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

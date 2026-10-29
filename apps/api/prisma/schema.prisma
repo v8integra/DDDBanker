@@ -1,0 +1,173 @@
+// Bank of Bramblewood data model. All money columns are integer cents (BigInt).
+// Datasource URL lives in prisma.config.ts.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String
+  name             String
+  addressLine1     String?
+  city             String?
+  region           String?
+  postalCode       String?
+  /// Simulated credit score, assigned at signup (580-820).
+  creditScore      Int
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  totpSecret       String?
+  createdAt        DateTime  @default(now())
+
+  sessions           Session[]
+  accounts           Account[]
+  auditLogs          AuditLog[]
+  idempotencyRecords IdempotencyRecord[]
+  transactions       Transaction[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  /// SHA-256 of the cookie token. The raw token is never stored.
+  tokenHash  String   @unique
+  /// Synchronizer token sent back in the X-CSRF-Token header.
+  csrfToken  String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  /// Absolute expiry. Idle expiry is lastSeenAt + idle timeout.
+  expiresAt  DateTime
+  ip         String?
+  userAgent  String?
+
+  @@index([userId])
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CD
+  CREDIT_CARD
+  AUTO_LOAN
+  MORTGAGE
+  PERSONAL_LOAN
+  SYSTEM
+}
+
+enum AccountStatus {
+  OPEN
+  FROZEN
+  CLOSED
+}
+
+model Account {
+  id              String        @id @default(cuid())
+  /// Null for the bank's internal system accounts.
+  userId          String?
+  user            User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Set only on system accounts, e.g. WELCOME_BONUS.
+  systemCode      String?       @unique
+  type            AccountType
+  nickname        String
+  /// Fake, generated account number.
+  number          String        @unique
+  status          AccountStatus @default(OPEN)
+  interestRateBps Int           @default(0)
+  /// Cached sum of this account's ledger entries, updated in the same DB transaction.
+  balanceCents    BigInt        @default(0)
+  createdAt       DateTime      @default(now())
+
+  entries LedgerEntry[]
+
+  @@index([userId])
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  BILL_PAY
+  CARD_PURCHASE
+  LOAN_DISBURSEMENT
+  LOAN_PAYMENT
+  INTEREST
+  FEE
+  P2P
+  WELCOME_BONUS
+}
+
+enum TransactionStatus {
+  PENDING
+  POSTED
+  FAILED
+  REVERSED
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  type              TransactionType
+  description       String
+  memo              String?
+  status            TransactionStatus @default(POSTED)
+  initiatedByUserId String?
+  initiatedBy       User?             @relation(fields: [initiatedByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime          @default(now())
+
+  entries LedgerEntry[]
+
+  @@index([initiatedByUserId])
+}
+
+model LedgerEntry {
+  id                Int         @id @default(autoincrement())
+  transactionId     String
+  transaction       Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  accountId         String
+  account           Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// What this side of the transaction shows on the account's history.
+  description       String
+  /// Signed: positive adds to the account balance, negative takes from it.
+  amountCents       BigInt
+  balanceAfterCents BigInt
+  createdAt         DateTime    @default(now())
+
+  @@index([accountId, id])
+  @@index([transactionId])
+}
+
+/// Stored result of a successful money-moving request, keyed per user.
+model IdempotencyRecord {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key          String
+  /// SHA-256 of route + request body, so a reused key with a different body is rejected.
+  requestHash  String
+  statusCode   Int
+  responseJson String
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, key])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  /// JSON string. Never contains passwords or tokens.
+  metadata  String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}

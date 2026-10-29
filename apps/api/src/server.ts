@@ -1,8 +1,11 @@
 import { buildApp } from './app';
+import { systemClock } from './clock';
 import { loadConfig } from './config';
+import { createDb } from './db';
 
 const config = loadConfig();
-const app = buildApp(config);
+const db = createDb(config.DATABASE_URL);
+const app = await buildApp({ config, db, clock: systemClock });
 
 try {
   await app.listen({ host: config.API_HOST, port: config.API_PORT });
@@ -13,6 +16,9 @@ try {
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
-    void app.close().then(() => process.exit(0));
+    void app
+      .close()
+      .then(() => db.$disconnect())
+      .then(() => process.exit(0));
   });
 }

@@ -3,3 +3,5 @@ dist
 coverage
 package-lock.json
 docs/3d-bank-plan.md
+apps/api/src/generated
+apps/api/prisma/migrations

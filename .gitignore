@@ -13,3 +13,7 @@ coverage/
 # Playwright
 test-results/
 playwright-report/
+
+# Prisma generated client (rebuilt by `prisma generate`)
+apps/api/src/generated/
+apps/api/.test-dbs/

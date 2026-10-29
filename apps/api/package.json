@@ -4,17 +4,33 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "dev": "node --watch --watch-preserve-output --import tsx src/server.ts",
     "start": "tsx src/server.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "pretest": "prisma generate",
+    "pretypecheck": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "predb:seed": "prisma generate && prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --force && prisma db seed"
   },
   "dependencies": {
     "@dddbanker/shared": "*",
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.2.1",
+    "@libsql/client": "^0.17.4",
+    "@node-rs/argon2": "^2.2.2",
+    "@prisma/adapter-libsql": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "fastify": "^5.12.7",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "prisma": "^7.10.1",
     "tsx": "^4.23.15"
   }
 }

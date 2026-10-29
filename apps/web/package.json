@@ -11,9 +11,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@dddbanker/shared": "*"
+    "@dddbanker/shared": "*",
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "three": "^0.186.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/three": "^0.186.0",
     "vite": "^8.3.5"
   }
 }
