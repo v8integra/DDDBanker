@@ -269,7 +269,7 @@ Target: **WCAG 2.2 AA for all HTML UI**, plus game accessibility best practices 
 
 Work in order. Each phase should end with something runnable and tests passing.
 
-### Phase 0 — Setup
+### Phase 0 — Setup ✅ (2026-10-29)
 - Monorepo with npm workspaces, TypeScript configs, ESLint/Prettier, Vitest.
 - `npm run dev` starts api and web together on Windows.
 - Shared package with bank config (name, colors) and money helpers.
@@ -343,3 +343,11 @@ Work in order. Each phase should end with something runnable and tests passing.
 ## Changelog
 
 - v0.1 — Initial plan.
+- v0.2 (2026-10-29) — Phase 0 complete.
+  - Plan moved to `docs/3d-bank-plan.md`. Packages are scoped `@dddbanker/*` so the bank name can change freely.
+  - Display name is **Bank of Bramblewood** (`BANK.name` in `packages/shared/src/bank.ts`); confirmed fictional, no real bank uses it.
+  - App code holds money as `number` integer cents (`Cents`, checked with `Number.isSafeInteger`). Rate math (`applyBps`) runs in BigInt with banker's rounding. Phase 1 will store cents as Prisma `BigInt` columns and convert at the repository boundary.
+  - Shared package is consumed as TypeScript source (no build step); the API runs through `tsx` in dev. A bundled API build gets added in Phase 8.
+  - Dev ports: API `127.0.0.1:3001`, web `127.0.0.1:5173`, with Vite proxying `/api` so cookies are same-origin.
+  - Planned for Phase 1: `db:migrate` / `db:seed` root scripts, and `@node-rs/argon2` (prebuilt Windows binaries) instead of `argon2`.
+  - Toolchain at setup: Node 24, TypeScript 6, Vite 8, Vitest 5, Fastify 5, Zod 4, ESLint 10.

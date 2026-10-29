@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+
+# SQLite databases (Phase 1)
+*.db
+*.db-journal
+
+# Playwright
+test-results/
+playwright-report/
