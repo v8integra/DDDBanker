@@ -175,6 +175,16 @@ describe('sessions', () => {
     expect((await client.get('/accounts')).statusCode).toBe(200);
   });
 
+  it('reports server time and when the idle timeout will hit', async () => {
+    const { client } = await signUp(ctx.app);
+    ctx.clock.advanceMinutes(3);
+    const session = (await client.get('/auth/session')).json();
+    const serverTime = Date.parse(session.serverTime);
+    expect(serverTime).toBe(ctx.clock.now().getTime());
+    // Signed up 3 minutes ago, untouched since: 12 minutes of idle time left.
+    expect(Date.parse(session.idleExpiresAt) - serverTime).toBe(12 * 60_000);
+  });
+
   it('ends at the absolute timeout regardless of activity', async () => {
     const { client } = await signUp(ctx.app);
     for (let i = 0; i < 12 * 6; i++) {

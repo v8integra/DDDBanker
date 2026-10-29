@@ -16,7 +16,7 @@ export interface PropContext {
 }
 
 /** Local-space helper: place parts relative to a prop's origin and Y rotation. */
-function local(ctx: PropContext, x: number, z: number, rotY: number) {
+export function local(ctx: PropContext, x: number, z: number, rotY: number) {
   const cos = Math.cos(rotY);
   const sin = Math.sin(rotY);
   const at = (lx: number, ly: number, lz: number): [number, number, number] => [

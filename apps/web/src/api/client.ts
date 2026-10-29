@@ -1,4 +1,10 @@
-import { API_PREFIX, type ApiError, type SessionInfo } from '@dddbanker/shared';
+import {
+  API_PREFIX,
+  CSRF_HEADER,
+  type ApiError,
+  type LoginInput,
+  type SessionInfo,
+} from '@dddbanker/shared';
 
 /**
  * Typed API client. Same-origin, cookie-based. The frontend never computes
@@ -7,10 +13,27 @@ import { API_PREFIX, type ApiError, type SessionInfo } from '@dddbanker/shared';
 export class ApiClient {
   private csrfToken: string | null = null;
 
-  async getSession(): Promise<SessionInfo> {
-    const session = await this.request<SessionInfo>('GET', '/auth/session');
-    this.csrfToken = session.authenticated ? session.csrfToken : null;
-    return session;
+  getSession(): Promise<SessionInfo> {
+    return this.session('GET', '/auth/session');
+  }
+
+  login(input: LoginInput): Promise<SessionInfo> {
+    return this.session('POST', '/auth/login', input);
+  }
+
+  logout(): Promise<SessionInfo> {
+    return this.session('POST', '/auth/logout', {});
+  }
+
+  /** "Stay checked in": slides the idle timeout forward. */
+  refreshSession(): Promise<SessionInfo> {
+    return this.session('POST', '/auth/session/refresh', {});
+  }
+
+  private async session(method: string, path: string, body?: unknown) {
+    const info = await this.request<SessionInfo>(method, path, body);
+    this.csrfToken = info.authenticated ? info.csrfToken : null;
+    return info;
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -19,7 +42,7 @@ export class ApiClient {
       credentials: 'same-origin',
       headers: {
         ...(body !== undefined && { 'content-type': 'application/json' }),
-        ...(this.csrfToken && method !== 'GET' && { 'x-csrf-token': this.csrfToken }),
+        ...(this.csrfToken && method !== 'GET' && { [CSRF_HEADER]: this.csrfToken }),
       },
       ...(body !== undefined && { body: JSON.stringify(body) }),
     });

@@ -82,8 +82,21 @@ export class Hud {
         ),
       ),
       this.hint,
+      this.toastEl,
       this.announcer,
     );
+  }
+
+  private readonly toastEl = h('p', { class: 'hud-toast', hidden: true });
+  private toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** A short message near the top of the screen, also read to screen readers. */
+  toast(message: string, ms = 3500) {
+    this.toastEl.textContent = message;
+    this.toastEl.hidden = false;
+    this.announce(message);
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => (this.toastEl.hidden = true), ms);
   }
 
   setLocation(name: string) {

@@ -188,7 +188,11 @@ export class Input {
   private onPointerDown(e: PointerEvent) {
     if (!this.enabled || this.pointerDown) return;
     this.surface.focus({ preventScroll: true });
-    this.surface.setPointerCapture(e.pointerId);
+    try {
+      this.surface.setPointerCapture(e.pointerId); // keep drags working off the edge of the canvas
+    } catch {
+      // Pointer already gone (or synthetic); the drag still works within the canvas.
+    }
     this.pointerDown = {
       x: e.clientX,
       y: e.clientY,

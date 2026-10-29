@@ -44,4 +44,6 @@ export type SessionInfo =
       /** ISO time the session ends if idle. Clients warn before this. */
       idleExpiresAt: string;
       absoluteExpiresAt: string;
+      /** Server's "now", so clients can time warnings without trusting their own clock. */
+      serverTime: string;
     };

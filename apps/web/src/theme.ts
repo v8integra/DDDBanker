@@ -59,6 +59,44 @@ export const palette = {
   clickMarker: '#ffd166',
 };
 
+/** Inside the bank. Its own coordinates: the entrance door is at z = 0, the hall is north (+Z). */
+export const interiorPalette = {
+  floor: '#efe3cc',
+  floorTile: '#e3d3b6',
+  rug: '#2f6f4f',
+  rugBorder: '#e8b04a',
+  wall: '#f6ecd9',
+  wallTrim: '#2f6f4f',
+  wainscot: '#c7a77d',
+  ceiling: '#fbf6ec',
+  ceilingLight: '#fff6dc',
+  desk: '#8a5a3c',
+  deskTop: '#f6ecd9',
+  monitor: '#3d4452',
+  screen: '#7fe0c8',
+  column: '#fbf6ec',
+  chair: '#2f6f4f',
+  vault: '#b8bcc6',
+  vaultDark: '#7d8290',
+  gatePost: '#3d4452',
+  gateGlass: '#bfe3f2',
+  gateLocked: '#e05d4f',
+  gateOpen: '#4caf6a',
+  board: '#2f6f4f',
+};
+
+export const interior = {
+  lobby: { minX: -10, maxX: 10, minZ: 0, maxZ: 12 },
+  hall: { minX: -15, maxX: 15, minZ: 12, maxZ: 36 },
+  ceiling: 6,
+  wallThickness: 0.4,
+  gate: { z: 12, halfOpening: 1.8, archHeight: 3.6 },
+  door: { width: 2.6, height: 3.2 },
+  /** Where you appear walking in, and the zone that takes you back outside. */
+  arrival: { x: 0, z: 4.2, facing: 0 },
+  exitZone: { minX: -1.3, maxX: 1.3, minZ: 0, maxZ: 0.8 },
+};
+
 export const playerColors = ['#ff8a5b', '#5bb8ff', '#8be07a', '#c69bff', '#ffd25b', '#ff7fb8'];
 
 export const layout = {

@@ -117,7 +117,7 @@ export async function destroySession(
   reply.clearCookie(config.sessionCookieName, { path: '/' });
 }
 
-export function toSessionInfo({ config }: AppDeps, auth: AuthContext | null): SessionInfo {
+export function toSessionInfo({ config, clock }: AppDeps, auth: AuthContext | null): SessionInfo {
   if (!auth) return { authenticated: false };
   const idle = minutesFrom(auth.lastSeenAt, config.SESSION_IDLE_MINUTES);
   return {
@@ -126,5 +126,6 @@ export function toSessionInfo({ config }: AppDeps, auth: AuthContext | null): Se
     csrfToken: auth.csrfToken,
     idleExpiresAt: (idle < auth.expiresAt ? idle : auth.expiresAt).toISOString(),
     absoluteExpiresAt: auth.expiresAt.toISOString(),
+    serverTime: clock.now().toISOString(),
   };
 }

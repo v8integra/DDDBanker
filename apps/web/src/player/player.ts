@@ -4,7 +4,7 @@ import { cameraRelativeMove, headingOf, turnToward } from '../camera/orbit';
 import type { FrameInput } from '../engine/input';
 import type { Physics } from '../engine/physics';
 import { player as tuning } from '../theme';
-import { Character } from './character';
+import type { Character } from './character';
 import { StuckDetector, steerToward, type Point2 } from './steering';
 
 const FOOT_OFFSET = tuning.halfHeight + tuning.radius; // capsule center -> feet
@@ -12,8 +12,8 @@ const SKIN = 0.02; // controller offset: gap kept between capsule and walls
 
 /** The player: a Rapier kinematic capsule driving the Character's visuals. */
 export class Player {
-  readonly character: Character;
   readonly collider: RAPIER.Collider;
+  private onArrive: (() => void) | null = null;
   private readonly body: RAPIER.RigidBody;
   private readonly controller: RAPIER.KinematicCharacterController;
   private readonly velocity = new THREE.Vector2(); // x, z (m/s)
@@ -26,9 +26,13 @@ export class Player {
   /** Feet position, updated after each physics step. */
   readonly position = new THREE.Vector3();
 
+  /**
+   * One Player per physics world (each scene has its own). The Character
+   * (visuals) is shared and moves between scenes with the player.
+   */
   constructor(
     private readonly physics: Physics,
-    color: string,
+    readonly character: Character,
     spawn: { x: number; y: number; z: number; facing: number },
   ) {
     const { rapier, world } = physics;
@@ -50,15 +54,24 @@ export class Player {
     this.controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
     this.controller.setApplyImpulsesToDynamicBodies(false);
 
-    this.character = new Character(color);
     this.heading = spawn.facing;
     this.syncVisuals();
   }
 
-  /** Start walking to a ground point (click-to-move). Null cancels. */
-  setWalkTarget(target: Point2 | null) {
+  /**
+   * Start walking to a ground point (click-to-move). `onArrive` runs only if
+   * the walk completes (not if it's cancelled or blocked). Null cancels.
+   */
+  setWalkTarget(target: Point2 | null, onArrive?: () => void) {
     this.walkTarget = target;
+    this.onArrive = target ? (onArrive ?? null) : null;
     this.stuck.reset();
+  }
+
+  /** Turn to face a point right away (e.g. the NPC you're talking to). */
+  faceToward(x: number, z: number) {
+    this.heading = headingOf(x - this.position.x, z - this.position.z);
+    this.character.root.rotation.y = this.heading;
   }
 
   get hasWalkTarget() {
@@ -71,7 +84,7 @@ export class Player {
     this.velocity.set(0, 0);
     this.verticalSpeed = 0;
     this.heading = facing;
-    this.walkTarget = null;
+    this.setWalkTarget(null);
     this.syncVisuals();
   }
 
@@ -81,7 +94,7 @@ export class Player {
     let desired: Point2 = { x: 0, z: 0 };
 
     if (input.manualMove) {
-      this.walkTarget = null;
+      this.setWalkTarget(null);
       const dir = cameraRelativeMove(input.move, cameraYaw);
       desired = { x: dir.x * speed, z: dir.z * speed };
     } else if (this.walkTarget) {
@@ -90,8 +103,15 @@ export class Player {
         this.walkTarget.x - this.position.x,
         this.walkTarget.z - this.position.z,
       );
-      if (!steer || this.stuck.update(distance, dt)) this.walkTarget = null;
-      else desired = steer;
+      if (!steer) {
+        const arrive = this.onArrive;
+        this.setWalkTarget(null);
+        arrive?.();
+      } else if (this.stuck.update(distance, dt)) {
+        this.setWalkTarget(null);
+      } else {
+        desired = steer;
+      }
     }
 
     // Quick but not instant acceleration feels responsive without jitter.

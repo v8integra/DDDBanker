@@ -18,8 +18,12 @@ export class Physics {
     this.world = new rapier.World({ x: 0, y: playerTheme.gravity, z: 0 });
   }
 
+  private static ready: Promise<void> | undefined;
+
+  /** A new physics world. Rapier's WebAssembly is loaded once and shared by every world. */
   static async create(): Promise<Physics> {
-    await RAPIER.init();
+    Physics.ready ??= RAPIER.init();
+    await Physics.ready;
     return new Physics(RAPIER);
   }
 

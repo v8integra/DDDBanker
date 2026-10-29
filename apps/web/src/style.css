@@ -253,14 +253,14 @@ kbd {
   cursor: pointer;
 }
 .retro-option:hover,
-.retro-option:focus-visible {
+.retro-option:focus {
   border-color: var(--window-border);
   background: rgba(255, 255, 255, 0.08);
   outline: none;
 }
 /* The blinking ▶ cursor next to the selected option. */
 .retro-option:hover::before,
-.retro-option:focus-visible::before {
+.retro-option:focus::before {
   content: '▶';
   position: absolute;
   left: 12px;
@@ -422,4 +422,97 @@ legend {
   .hud-chip__value {
     font-size: 0.85rem;
   }
+}
+
+/* ---------- Phase 3: prompts, toasts, dialogue, fades ---------- */
+.interact-prompt {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 14px 6px 8px;
+  border: 3px solid var(--window-border);
+  border-radius: 999px;
+  background: var(--window-bg);
+  color: var(--window-text);
+  font: 700 0.95rem var(--font-body);
+  box-shadow: 0 3px 0 var(--window-shadow);
+  cursor: pointer;
+  white-space: nowrap;
+  pointer-events: auto;
+  will-change: transform;
+}
+.interact-prompt kbd {
+  background: var(--accent);
+  color: #1d2433;
+  border-color: var(--window-shadow);
+}
+.interact-prompt[hidden] {
+  display: none;
+}
+
+.hud-toast {
+  position: absolute;
+  left: 50%;
+  top: 76px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 10px 16px;
+  border: 3px solid var(--window-border);
+  border-radius: 10px;
+  background: var(--window-bg);
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 4px 0 var(--window-shadow);
+}
+.hud-toast[hidden] {
+  display: none;
+}
+
+.dialogue-box {
+  width: min(720px, calc(100% - 32px));
+  margin: auto auto 24px;
+}
+.dialogue-box::backdrop {
+  background: rgba(13, 19, 48, 0.15);
+}
+.dialogue-box__speaker {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 18px 0;
+}
+.dialogue-box__role {
+  color: var(--window-muted);
+  font-size: 0.9rem;
+}
+.dialogue-box__text {
+  padding: 4px 18px 0;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+.dialogue-box__text p {
+  margin: 8px 0;
+}
+.dialogue-box__text ul {
+  margin: 4px 0 8px;
+  padding-left: 22px;
+}
+.dialogue-box__choices {
+  padding: 6px 12px 14px;
+}
+
+.fade {
+  position: fixed;
+  inset: 0;
+  background: #0d1330;
+  opacity: 0;
+  pointer-events: none;
+  transition-property: opacity;
+  transition-timing-function: ease;
+  z-index: 5;
 }

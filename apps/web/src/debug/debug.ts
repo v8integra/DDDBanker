@@ -15,9 +15,10 @@ export class DebugOverlay {
   private fps = 0;
   showColliders = true;
 
+  /** Getters, because the active scene and physics world change at doors. */
   constructor(
-    scene: THREE.Scene,
-    private readonly physics: Physics,
+    private readonly scene: () => THREE.Scene,
+    private readonly physics: () => Physics,
   ) {
     this.panel = document.createElement('div');
     this.panel.className = 'debug-panel';
@@ -35,7 +36,6 @@ export class DebugOverlay {
     );
     this.lines.renderOrder = 999;
     this.lines.frustumCulled = false;
-    scene.add(this.lines);
 
     window.addEventListener('keydown', (e) => {
       if (e.code === 'F3') {
@@ -54,9 +54,11 @@ export class DebugOverlay {
       this.elapsed = 0;
     }
 
+    const scene = this.scene();
+    if (this.lines.parent !== scene) scene.add(this.lines);
     this.lines.visible = this.showColliders;
     if (this.showColliders) {
-      const { vertices, colors } = this.physics.world.debugRender();
+      const { vertices, colors } = this.physics().world.debugRender();
       const geometry = this.lines.geometry;
       geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));

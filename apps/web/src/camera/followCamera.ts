@@ -23,17 +23,29 @@ export class FollowCamera {
   private readonly ray: RAPIER.Ray;
   private initialized = false;
 
+  /** Each scene has its own FollowCamera (own physics world); they share one THREE camera. */
   constructor(
     private readonly physics: Physics,
     private readonly ignore: RAPIER.Collider,
+    camera: THREE.PerspectiveCamera,
   ) {
-    this.camera = new THREE.PerspectiveCamera(tuning.fov, 1, 0.1, 200);
+    this.camera = camera;
     this.ray = new physics.rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
+  }
+
+  static createCamera() {
+    return new THREE.PerspectiveCamera(tuning.fov, 1, 0.1, 200);
   }
 
   /** Yaw used to turn keyboard/stick input into world directions. */
   get yaw() {
     return this.orbit.yaw;
+  }
+
+  /** Snap behind the player at `yaw` on the next update (after a scene change). */
+  reset(yaw: number) {
+    this.orbit = { yaw, pitch: tuning.defaultPitch, distance: this.orbit.distance };
+    this.initialized = false;
   }
 
   update(dt: number, target: THREE.Vector3, input: FrameInput, settings: Settings) {
@@ -54,7 +66,8 @@ export class FollowCamera {
     );
 
     const goal = new THREE.Vector3(target.x, target.y + tuning.targetHeight, target.z);
-    if (!this.initialized) {
+    const snap = !this.initialized;
+    if (snap) {
       this.lookAt.copy(goal);
       this.initialized = true;
     } else {
@@ -68,7 +81,7 @@ export class FollowCamera {
 
     // Pull in immediately when blocked; ease back out once clear.
     this.currentDistance =
-      allowed < this.currentDistance
+      snap || allowed < this.currentDistance
         ? allowed
         : this.currentDistance + (allowed - this.currentDistance) * (1 - Math.exp(-dt * 4));
 

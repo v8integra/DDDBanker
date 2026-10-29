@@ -37,7 +37,8 @@ export function createSignFace({
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const titleSize = canvas.height * 0.17;
+  // A single line (station signs, the gate) gets most of the height; plaques get a title + body.
+  const titleSize = canvas.height * (lines.length === 1 ? 0.5 : 0.17);
   const bodySize = canvas.height * 0.105;
   const lineGap = bodySize * 1.35;
   const blockHeight = titleSize * 1.4 + (lines.length - 1) * lineGap;

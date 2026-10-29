@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { BANK } from '@dddbanker/shared';
 import { layout, palette } from '../theme';
 import { blockTextWidth, createBlockText } from './props/blockFont';
+import { DoubleDoor } from './door';
 import { flowerPlanter, type PropContext } from './props/props';
 
 const S = layout.sidewalkHeight;
@@ -40,8 +41,8 @@ function outdoorAtm(ctx: PropContext, root: THREE.Group, x: number) {
   ctx.physics.addBox({ x, y: S + 1.1, z: z + 0.05 }, { x: 0.6, y: 1.1, z: 0.25 });
 }
 
-/** The Bank of Bramblewood: facade, portico, signage, and its colliders. */
-export function buildBank(ctx: PropContext, root: THREE.Group) {
+/** The Bank of Bramblewood: facade, portico, signage, and its colliders. Returns the front door. */
+export function buildBank(ctx: PropContext, root: THREE.Group): DoubleDoor {
   const { batch, physics } = ctx;
   const width = maxX - minX;
   const cx = (minX + maxX) / 2;
@@ -68,25 +69,14 @@ export function buildBank(ctx: PropContext, root: THREE.Group) {
   const doorBase = S + 0.3;
   const doorZ = frontZ - 0.05;
   batch.box([doorW + 0.6, doorH + 0.9, 0.12], [0, doorBase, doorZ], palette.bankTrim);
-  for (const side of [-1, 1]) {
-    const x = (side * doorW) / 4;
-    batch.box([doorW / 2 - 0.06, doorH, 0.1], [x, doorBase, doorZ - 0.08], palette.door);
-    batch.box(
-      [doorW / 2 - 0.5, doorH * 0.55, 0.04],
-      [x, doorBase + doorH * 0.35, doorZ - 0.14],
-      palette.doorGlass,
-      {
-        emissive: palette.doorGlass,
-        castShadow: false,
-      },
-    );
-    batch.box(
-      [0.06, 0.5, 0.08],
-      [x - side * (doorW / 4 - 0.2), doorBase + 1.3, doorZ - 0.18],
-      palette.brass,
-      { castShadow: false },
-    );
-  }
+  // Warm light from the lobby shows through when the doors swing open.
+  batch.box([doorW, doorH, 0.02], [0, doorBase, doorZ - 0.07], palette.doorGlass, {
+    emissive: palette.doorGlass,
+    castShadow: false,
+  });
+  const door = new DoubleDoor(doorW, doorH, -1);
+  door.group.position.set(0, doorBase, doorZ - 0.16);
+  root.add(door.group);
   batch.box([doorW, 0.6, 0.05], [0, doorBase + doorH + 0.12, doorZ - 0.1], palette.doorGlass, {
     emissive: palette.doorGlass,
     castShadow: false,
@@ -154,4 +144,6 @@ export function buildBank(ctx: PropContext, root: THREE.Group) {
       root.add(mesh);
     });
   }
+
+  return door;
 }
