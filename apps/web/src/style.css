@@ -516,3 +516,198 @@ legend {
   transition-timing-function: ease;
   z-index: 5;
 }
+
+/* ---------- Phase 4: window system ---------- */
+:root {
+  --credit: #8ee6a8;
+  --debit: #ffaaa6;
+  --error: #ffb4a8;
+  --notice-bg: rgba(255, 209, 102, 0.14);
+  --field-bg: #fbf6ec;
+  --field-text: #1d2433;
+}
+:root[data-contrast='high'] {
+  --credit: #7dff9e;
+  --debit: #ff9c9c;
+  --error: #ffd0c8;
+  --notice-bg: #000;
+  --field-bg: #fff;
+  --field-text: #000;
+}
+
+.retro-text {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.retro-window--form {
+  width: min(480px, calc(100% - 32px));
+}
+.retro-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.notice {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  background: var(--notice-bg);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.field label {
+  font-weight: 700;
+}
+.field__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--window-muted);
+}
+.field__control {
+  display: flex;
+  gap: 6px;
+}
+.field input,
+.field select {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 3px solid var(--window-border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  color: var(--field-text);
+  font: 1.05rem var(--font-body);
+}
+.field input[aria-invalid='true'] {
+  border-color: var(--error);
+  box-shadow: 0 0 0 2px var(--error);
+}
+.field__reveal {
+  min-width: 64px;
+  min-height: 44px;
+  border: 3px solid var(--window-border);
+  border-radius: 8px;
+  background: var(--window-bg-2);
+  color: var(--window-text);
+  font: 700 0.9rem var(--font-body);
+  cursor: pointer;
+}
+.field__error,
+.form-error {
+  margin: 0;
+  color: var(--error);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.form-error {
+  padding: 8px 12px;
+  border: 2px solid var(--error);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.field__error[hidden],
+.form-error[hidden] {
+  display: none;
+}
+.retro-option--primary {
+  border-color: var(--window-border);
+  background: rgba(255, 209, 102, 0.12);
+}
+.retro-option:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.retro-option__hint {
+  display: block;
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--window-muted);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+.retro-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.retro-table th,
+.retro-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(245, 241, 232, 0.18);
+  white-space: nowrap;
+}
+.retro-table thead th {
+  font-family: var(--font-pixel);
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: var(--accent);
+}
+.retro-table tbody th {
+  font-weight: 700;
+}
+.retro-table .cell--end {
+  text-align: right;
+}
+
+.detail-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0 0 12px;
+}
+.detail-list dt {
+  color: var(--window-muted);
+}
+.detail-list dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.money {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.money--credit {
+  color: var(--credit);
+}
+.money--debit {
+  color: var(--debit);
+}
+
+.result-banner {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  font-weight: 700;
+}
+.result-banner--success {
+  color: var(--credit);
+}
+.result-banner--error {
+  color: var(--error);
+}
+.result-banner--info {
+  color: var(--accent);
+}
+
+/* Typed-out NPC lines reserve their space so the box doesn't jump. */
+.dialogue-box__text p[aria-hidden='true'] {
+  min-height: 1.5em;
+}

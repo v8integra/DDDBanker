@@ -15,7 +15,8 @@ import type { SettingsStore } from '../settings/settings';
 import { infoBoardLines, runStation } from '../stations/handlers';
 import { interior } from '../theme';
 import { DialogStack } from '../ui/dialogs';
-import { showDialogue, type DialogueOptions } from '../ui/dialogue';
+import { installMenuKeys } from '../ui/windows/menuKeys';
+import { Windows, type DialogueOptions } from '../ui/windows/windows';
 import { Fade } from '../ui/fade';
 import { Hud } from '../ui/hud';
 import { createMenus } from '../ui/menus';
@@ -43,6 +44,7 @@ export class Game {
   private readonly hud: Hud;
   private readonly prompt: InteractPrompt;
   private readonly fade: Fade;
+  private readonly ui: Windows;
   private readonly marker = new ClickMarker();
   private readonly raycaster = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
@@ -75,6 +77,8 @@ export class Game {
     );
     uiRoot.append(this.prompt.el);
     this.fade = new Fade(uiRoot);
+    this.ui = new Windows(this.dialogs, uiRoot, () => this.store.get().reducedMotion);
+    installMenuKeys();
     new TimeoutWarning(watcher, this.dialogs, uiRoot);
 
     this.input.onPause = menus.openPause;
@@ -367,14 +371,14 @@ export class Game {
     }
     this.setBusy(false);
     try {
-      await runStation(station.def, { watcher: this.watcher, say: (o) => this.say(o) });
+      await runStation(station.def, { watcher: this.watcher, api: this.api, ui: this.ui });
     } finally {
       npc?.resetFacing();
     }
   }
 
   private say<T extends string = 'ok'>(options: DialogueOptions<T>) {
-    return showDialogue<T>(this.dialogs, this.uiRoot, options);
+    return this.ui.dialogue<T>(options);
   }
 
   private handleClick(click: { x: number; y: number }) {

@@ -1,9 +1,11 @@
 import {
   API_PREFIX,
   CSRF_HEADER,
+  type AccountSummary,
   type ApiError,
   type LoginInput,
   type SessionInfo,
+  type SignupInput,
 } from '@dddbanker/shared';
 
 /**
@@ -19,6 +21,15 @@ export class ApiClient {
 
   login(input: LoginInput): Promise<SessionInfo> {
     return this.session('POST', '/auth/login', input);
+  }
+
+  /** Opens checking + savings with the welcome bonus, and signs you in. */
+  signup(input: SignupInput): Promise<SessionInfo> {
+    return this.session('POST', '/auth/signup', input);
+  }
+
+  getAccounts(): Promise<AccountSummary[]> {
+    return this.request('GET', '/accounts');
   }
 
   logout(): Promise<SessionInfo> {
