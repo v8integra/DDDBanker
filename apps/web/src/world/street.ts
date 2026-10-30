@@ -18,6 +18,12 @@ const S = layout.sidewalkHeight;
 const { road, bounds } = layout;
 const FAR = 60; // how far the street runs off into the fog
 
+/** Street lamp positions (ground level), also used for evening lights. */
+export const LAMP_POSITIONS = [
+  ...[-15, -8, 8, 15].map((x) => ({ x, z: road.maxZ + 0.7 })),
+  ...[-11, 0, 11].map((x) => ({ x, z: road.minZ - 0.7 })),
+];
+
 /** Ground surfaces stay separate meshes so click-to-move can raycast them. */
 function surface(width: number, depth: number, topY: number, x: number, z: number, color: string) {
   const thickness = 0.2;
@@ -78,8 +84,7 @@ export function buildStreet(ctx: PropContext, root: THREE.Group): THREE.Mesh[] {
   }
 
   // Street furniture.
-  for (const x of [-15, -8, 8, 15]) lampPost(ctx, x, road.maxZ + 0.7);
-  for (const x of [-11, 0, 11]) lampPost(ctx, x, road.minZ - 0.7);
+  for (const { x, z } of LAMP_POSITIONS) lampPost(ctx, x, z);
   for (const x of [-12, 12]) tree(ctx, x, road.maxZ + 1.0, 1);
   for (const x of [-5.5, 5.5, 16]) tree(ctx, x, road.minZ - 1.4, 0.9);
   // Benches put their backs to the wall behind them (local +Z is the backrest).

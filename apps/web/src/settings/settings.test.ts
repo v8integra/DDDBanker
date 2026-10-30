@@ -64,6 +64,17 @@ describe('parseSettings', () => {
     expect(bad.keyBindings).toEqual({});
   });
 
+  it('validates sound and lighting', () => {
+    expect(defaults.muted).toBe(false);
+    expect(defaults.lighting).toBe('day');
+    const ok = parseSettings({ muted: true, masterVolume: 0.3, lighting: 'evening' }, defaults);
+    expect(ok).toMatchObject({ muted: true, masterVolume: 0.3, lighting: 'evening' });
+    const bad = parseSettings({ masterVolume: 2, menuVolume: -1, lighting: 'night' }, defaults);
+    expect(bad.masterVolume).toBe(defaults.masterVolume);
+    expect(bad.menuVolume).toBe(defaults.menuVolume);
+    expect(bad.lighting).toBe('day');
+  });
+
   it('handles junk', () => {
     expect(parseSettings(null, defaults)).toEqual(defaults);
     expect(parseSettings('nope', defaults)).toEqual(defaults);

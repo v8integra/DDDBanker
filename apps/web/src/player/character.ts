@@ -21,6 +21,9 @@ export interface CharacterLook {
  * procedurally (no rig): feet step, arms swing, body bobs.
  * Origin is at the feet; faces +Z. Used for the player and the bank's staff.
  */
+const WAVE_SECONDS = 1.4;
+const REST_ARM_TILT = 0.18;
+
 export class Character {
   readonly root = new THREE.Group();
   private readonly body = new THREE.Group();
@@ -30,6 +33,8 @@ export class Character {
   private phase = 0;
   private amplitude = 0;
   private idleTime = 0;
+  /** Seconds left in a wave, counting down. */
+  private waveLeft = 0;
 
   constructor({
     color,
@@ -102,7 +107,7 @@ export class Character {
     for (const side of [-1, 1]) {
       const arm = new THREE.Mesh(armGeometry, toon(color));
       arm.position.set(side * 0.4, 0.95, 0);
-      arm.rotation.z = side * 0.18;
+      arm.rotation.z = side * REST_ARM_TILT;
       this.arms.push(arm);
       this.colored.push(arm);
     }
@@ -125,6 +130,11 @@ export class Character {
     for (const mesh of this.colored) mesh.material = toon(color);
   }
 
+  /** A friendly wave with the right hand. */
+  wave() {
+    this.waveLeft = WAVE_SECONDS;
+  }
+
   /** `speed01` is current speed as a fraction of run speed. */
   animate(dt: number, speed01: number, reducedMotion: boolean) {
     const moving = speed01 > 0.02;
@@ -141,6 +151,7 @@ export class Character {
     this.feet[1]!.position.y = 0.08 + Math.max(0, -swing) * 0.06;
     this.arms[0]!.rotation.x = -swing * 0.7;
     this.arms[1]!.rotation.x = swing * 0.7;
+    this.animateWave(dt, reducedMotion);
 
     if (reducedMotion) {
       this.body.position.y = 0;
@@ -151,5 +162,21 @@ export class Character {
     const breathe = moving ? 0 : Math.sin(this.idleTime * 2.2) * 0.012;
     this.body.position.y = bob + breathe;
     this.body.rotation.x = speed01 * 0.08; // lean into the walk
+  }
+
+  private animateWave(dt: number, reducedMotion: boolean) {
+    // Facing +Z, the right hand is arms[0] (on -X); raising it turns it about -Z.
+    const arm = this.arms[0]!;
+    if (this.waveLeft <= 0) {
+      arm.rotation.z = -REST_ARM_TILT;
+      return;
+    }
+    this.waveLeft = Math.max(0, this.waveLeft - dt);
+    const t = 1 - this.waveLeft / WAVE_SECONDS;
+    // Lift, wave, lower. With reduced motion the hand just goes up and down.
+    const lift = Math.sin(Math.PI * t);
+    const wag = reducedMotion ? 0 : Math.sin(t * Math.PI * 8) * 0.3 * lift;
+    arm.rotation.z = -REST_ARM_TILT - lift * 2.3 + wag;
+    arm.rotation.x = 0;
   }
 }

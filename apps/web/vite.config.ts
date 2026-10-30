@@ -16,10 +16,23 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
+    // Rapier (physics, with its WebAssembly inlined) and Three.js are most of
+    // the download. Separate chunks keep them cached across app updates.
+    chunkSizeWarningLimit: 4500,
+    // Fonts stay real files (the CSP allows fonts from 'self' only, not data:).
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf)$/.test(file) ? false : undefined),
+    rolldownOptions: {
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         classic: resolve(import.meta.dirname, 'classic.html'),
+      },
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'rapier', test: /node_modules[\\/]@dimforge[\\/]/ },
+            { name: 'three', test: /node_modules[\\/]three[\\/]/ },
+          ],
+        },
       },
     },
   },

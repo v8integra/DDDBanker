@@ -32,6 +32,13 @@ Target: WCAG 2.1 AA for everything outside the 3D canvas.
 - [x] Focus is always visible (a thick outline on every control).
 - [x] Touch targets are at least 44 px.
 
+## Sound
+
+- [x] Soft synthesized sounds for menus (move, pick, back, error, done, new notice) and the world (doors, the gate chime and lock).
+- [x] **No sound-only information:** every sound goes with something on screen and, where it matters, a live announcement, so there's nothing to caption.
+- [x] Settings → Sound: mute, overall volume, and separate menu and world volumes. The sliders play a sample when you let go.
+- [x] Nothing plays until you click or press a key, and nothing loops or plays in the background.
+
 ## Screen readers
 
 - [x] Menus and windows are native `<dialog>` elements opened with `showModal()`, so focus stays inside and the background is inert. Each is labelled by its title.
@@ -52,6 +59,8 @@ Target: WCAG 2.1 AA for everything outside the 3D canvas.
 - a station dialogue, a table window, and display settings with high contrast and colorblind colors on;
 - the 3D page's HUD, pause menu, Settings and quick travel.
 
+Every spec also fails on any console error or CSP violation. `npm run test:e2e:prod` runs the same specs against the production build.
+
 The specs also check that locked stations wait for check-in, that dialogs have the right name, description and focus, that focus comes back after closing, and that a remapped key is saved.
 
 Unit tests cover key binding rules (`engine/bindings.test.ts`) and settings validation (`settings/settings.test.ts`).
@@ -65,7 +74,6 @@ Unit tests cover key binding rules (`engine/bindings.test.ts`) and settings vali
 - [ ] VoiceOver pass on macOS and iOS (Safari).
 - [ ] Windows High Contrast / forced colors mode check.
 - [ ] Zoom to 200% and 400% (reflow) on the classic view.
-- [ ] Sound and volume settings arrive with sounds in Phase 8. No audio exists yet, so there's nothing to caption.
 
 ## Known limits
 

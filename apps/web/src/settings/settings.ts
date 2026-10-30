@@ -3,6 +3,9 @@ import { playerColors } from '../theme';
 
 export const GRAPHICS_QUALITIES = ['low', 'medium', 'high'] as const;
 export const TEXT_SCALES = [1, 1.125, 1.25, 1.5] as const;
+export const LIGHTINGS = ['day', 'evening'] as const;
+
+const volume = z.number().min(0).max(1);
 
 // Each field falls back on its own, so one bad stored value doesn't wipe the rest.
 const settingsSchema = (d: Settings) =>
@@ -26,6 +29,11 @@ const settingsSchema = (d: Settings) =>
     statusColors: z.enum(STATUS_PALETTES).catch(d.statusColors),
     /** Key overrides per action (see engine/bindings resolveBindings). */
     keyBindings: z.record(z.string(), z.array(z.string()).max(3)).catch(d.keyBindings),
+    muted: z.boolean().catch(d.muted),
+    masterVolume: volume.catch(d.masterVolume),
+    menuVolume: volume.catch(d.menuVolume),
+    worldVolume: volume.catch(d.worldVolume),
+    lighting: z.enum(LIGHTINGS).catch(d.lighting),
   });
 
 /** Status colors: standard red/green, or a colorblind-safe orange/blue. Icons and words always accompany them. */
@@ -44,6 +52,12 @@ export interface Settings {
   playerColor: string;
   statusColors: (typeof STATUS_PALETTES)[number];
   keyBindings: Record<string, string[]>;
+  muted: boolean;
+  /** 0..1 each; the sound board multiplies master by the channel. */
+  masterVolume: number;
+  menuVolume: number;
+  worldVolume: number;
+  lighting: (typeof LIGHTINGS)[number];
 }
 
 export interface Environment {
@@ -67,6 +81,11 @@ export function defaultSettings(env: Environment): Settings {
     playerColor: playerColors[0]!,
     statusColors: 'standard',
     keyBindings: {},
+    muted: false,
+    masterVolume: 0.6,
+    menuVolume: 0.8,
+    worldVolume: 0.8,
+    lighting: 'day',
   };
 }
 

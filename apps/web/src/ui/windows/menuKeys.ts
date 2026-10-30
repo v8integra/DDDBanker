@@ -1,3 +1,5 @@
+import { sounds } from '../../audio/sounds';
+
 const UP = new Set(['ArrowUp', 'KeyW']);
 const DOWN = new Set(['ArrowDown', 'KeyS']);
 
@@ -40,6 +42,7 @@ export function installMenuKeys(root: Document = document) {
     else if (e.code === 'End') next = options.length - 1;
     if (next === -1) return;
     e.preventDefault();
+    if (next !== index) sounds.play('move');
     options[next]!.focus();
   });
 }

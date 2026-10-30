@@ -6,12 +6,17 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const api = resolve(dirname(fileURLToPath(import.meta.url)), '../apps/api');
+// E2E_PROD=1 runs the production build: one origin serving the built web
+// app, secure cookies, the page CSP, rate limits on and dev tools off.
+const prod = Boolean(process.env.E2E_PROD);
 const env = {
   ...process.env,
   DATABASE_URL: 'file:./prisma/e2e.db',
   API_PORT: '3101',
-  RATE_LIMITS_ENABLED: 'false',
   LOG_LEVEL: 'warn',
+  ...(prod
+    ? { NODE_ENV: 'production', WEB_DIST: '../web/dist' }
+    : { RATE_LIMITS_ENABLED: 'false' }),
 };
 
 for (const suffix of ['', '-journal', '-wal', '-shm']) {

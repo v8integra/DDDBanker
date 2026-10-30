@@ -8,6 +8,12 @@ export const palette = {
   hemiSky: '#e8f6ff',
   hemiGround: '#a7c48a',
   sun: '#fff4dc',
+  // Evening: a dusky blue sky with a low orange sun.
+  eveningSky: '#47507f',
+  eveningFog: '#6a6a8f',
+  eveningHemiSky: '#8a93c9',
+  eveningHemiGround: '#4d4a5a',
+  sunset: '#ffa36b',
 
   grass: '#8cc56b',
   sidewalk: '#e9ddc7',

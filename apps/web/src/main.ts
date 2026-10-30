@@ -1,5 +1,7 @@
+import './boot';
 import { BANK } from '@dddbanker/shared';
 import { ApiClient } from './api/client';
+import { sounds } from './audio/sounds';
 import { SessionWatcher } from './auth/sessionWatcher';
 import { createRenderer } from './engine/renderer';
 import { Game } from './game/game';
@@ -22,6 +24,7 @@ function applyDocumentSettings(s: Settings) {
   root.dataset.contrast = s.highContrast ? 'high' : 'normal';
   root.dataset.reducedMotion = String(s.reducedMotion);
   root.dataset.statusColors = s.statusColors;
+  sounds.configure(s);
 }
 
 /** Wait briefly for web fonts so canvas-drawn signs use them; never block for long. */

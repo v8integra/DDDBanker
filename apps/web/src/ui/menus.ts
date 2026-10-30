@@ -1,7 +1,9 @@
 import { BANK } from '@dddbanker/shared';
+import { sounds } from '../audio/sounds';
 import { ACTIONS, canBind, rebind, resolveBindings, type Action } from '../engine/bindings';
 import {
   GRAPHICS_QUALITIES,
+  LIGHTINGS,
   STATUS_PALETTES,
   TEXT_SCALES,
   type Settings,
@@ -276,6 +278,33 @@ export function createSettingsDialog(store: SettingsStore) {
     sensitivityOutput.textContent = `${s.cameraSensitivity.toFixed(2)}×`;
   });
 
+  type VolumeKey = 'masterVolume' | 'menuVolume' | 'worldVolume';
+  const volumeSlider = (key: VolumeKey, label: string, preview: 'confirm' | 'chime') => {
+    const id = `setting-${key}`;
+    const output = h('output', { for: id });
+    const input = h('input', {
+      type: 'range',
+      id,
+      min: '0',
+      max: '1',
+      step: '0.1',
+      oninput: (e) => update({ [key]: Number((e.target as HTMLInputElement).value) }),
+      // A sample on release, so you hear the new level.
+      onchange: () => sounds.play(preview),
+    });
+    syncers.push((s) => {
+      input.value = String(s[key]);
+      output.textContent = `${Math.round(s[key] * 100)}%`;
+      input.disabled = s.muted;
+    });
+    return h(
+      'div',
+      { class: 'setting setting--stacked' },
+      h('label', { for: id }, label),
+      h('div', { class: 'setting__range' }, input, output),
+    );
+  };
+
   const swatches = playerColors.map((color, i) =>
     h('button', {
       type: 'button',
@@ -329,11 +358,25 @@ export function createSettingsDialog(store: SettingsStore) {
         v === 'standard' ? 'Standard (red and green)' : 'Colorblind-safe (orange and blue)',
       ),
     ),
+    h(
+      'fieldset',
+      {},
+      h('legend', {}, 'Sound'),
+      checkbox(
+        'muted',
+        'Mute all sounds',
+        'Every sound goes with something on screen, so nothing is missed when muted.',
+      ),
+      volumeSlider('masterVolume', 'Overall volume', 'confirm'),
+      volumeSlider('menuVolume', 'Menu sounds', 'confirm'),
+      volumeSlider('worldVolume', 'World sounds (doors, gate)', 'chime'),
+    ),
     controlsFieldset(store, syncers),
     h(
       'fieldset',
       {},
       h('legend', {}, 'Display'),
+      select('lighting', 'Time of day', LIGHTINGS, (v) => (v === 'day' ? 'Daytime' : 'Evening')),
       select(
         'graphics',
         'Graphics quality',

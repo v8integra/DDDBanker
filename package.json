@@ -21,7 +21,10 @@
     "db:seed": "npm run db:seed -w @dddbanker/api",
     "db:reset": "npm run db:reset -w @dddbanker/api",
     "predev": "npm run db:generate -w @dddbanker/api && npm run db:deploy -w @dddbanker/api",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:prod": "npm run build -w @dddbanker/web && node e2e/run-prod.mjs",
+    "start": "npm run start -w @dddbanker/api",
+    "db:deploy": "npm run db:deploy -w @dddbanker/api"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ORBIT_LIMITS,
   applyOrbitInput,
   cameraRelativeMove,
   headingOf,
+  ORBIT_LIMITS,
   orbitOffset,
   turnToward,
   wrapAngle,
+  yawBehind,
 } from './orbit';
 
 const opts = { sensitivity: 1, invertY: false };
@@ -89,6 +90,18 @@ describe('angles', () => {
 
   it('heading 0 faces +Z', () => {
     expect(headingOf(0, 1)).toBeCloseTo(0);
+    expect(headingOf(1, 0)).toBeCloseTo(Math.PI / 2);
+  });
+});
+
+describe('yawBehind', () => {
+  it('puts the camera on the far side from where the player looks', () => {
+    for (const heading of [0, Math.PI / 2, -Math.PI / 2, 2.5]) {
+      const offset = orbitOffset({ yaw: yawBehind(heading), pitch: 0, distance: 1 });
+      const look = { x: Math.sin(heading), z: Math.cos(heading) };
+      // Camera offset points opposite to the look direction.
+      expect(offset.x * look.x + offset.z * look.z).toBeCloseTo(-1);
+    }
     expect(headingOf(1, 0)).toBeCloseTo(Math.PI / 2);
   });
 });

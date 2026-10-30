@@ -1,4 +1,5 @@
 import { ApiRequestError } from '../../api/client';
+import { sounds } from '../../audio/sounds';
 import { h, type DialogStack } from '../dialogs';
 import { NO_ERRORS, errorsFromApi, hasErrors, type FormErrors } from './formErrors';
 import type { MoneyCell } from './money';
@@ -182,6 +183,7 @@ export class Windows {
   }) {
     const icon = { success: '✓', error: '⚠', info: 'ℹ' }[options.tone];
     const word = { success: 'Done', error: 'Problem', info: 'Note' }[options.tone];
+    if (options.tone !== 'info') sounds.play(options.tone);
     await this.present<'ok'>((settle) =>
       this.window(
         options.title,
@@ -382,6 +384,7 @@ export class Windows {
         }
         formError.hidden = !errors.form;
         formError.textContent = errors.form ? `⚠ ${errors.form}` : '';
+        if (hasErrors(errors)) sounds.play('error');
         if (firstInvalid) firstInvalid.focus();
       };
 
@@ -500,7 +503,10 @@ export class Windows {
             type: 'button',
             class: 'retro-option',
             ...(i === focusIndex ? { autofocus: true } : {}),
-            onclick: () => settle(choice.value),
+            onclick: () => {
+              sounds.play('confirm');
+              settle(choice.value);
+            },
           },
           choice.label,
           choice.hint ? h('span', { class: 'retro-option__hint' }, choice.hint) : null,
@@ -522,6 +528,8 @@ export class Windows {
       };
       dialog = build(settle);
       dialog.addEventListener('close', () => {
+        // Closed without a pick: Back, Escape, or the ✕.
+        if (result === null) sounds.play('cancel');
         dialog!.remove();
         resolve(result);
       });

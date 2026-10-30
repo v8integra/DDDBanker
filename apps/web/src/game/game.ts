@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import type { ApiClient } from '../api/client';
+import { sounds } from '../audio/sounds';
 import type { SessionWatcher } from '../auth/sessionWatcher';
 import { FollowCamera } from '../camera/followCamera';
+import { yawBehind } from '../camera/orbit';
 import { DEBUG, DebugOverlay } from '../debug/debug';
 import { resolveBindings } from '../engine/bindings';
 import { Input } from '../engine/input';
@@ -64,6 +66,8 @@ export class Game {
   /** Mid door-transition or turning to talk: the world runs, but the player can't act. */
   private busy = false;
   private walked = 0;
+  /** What the prompt pointed at last frame, so staff greet you once per approach. */
+  private lastTargetId: string | null = null;
   private debug: DebugOverlay | null = null;
 
   constructor(
@@ -151,6 +155,11 @@ export class Game {
       if (!s.clickToMove) this.active.player.setWalkTarget(null);
       this.input.bindings = resolveBindings(s.keyBindings);
       this.interiorParts?.gate.setPalette(s.statusColors);
+      if (s === prev || s.lighting !== prev.lighting || s.graphics !== prev.graphics) {
+        this.exterior.lighting.apply(s.lighting, s.graphics);
+        // Rendering pauses behind menus; show the change behind Settings now.
+        if (s !== prev) this.renderNow();
+      }
     });
 
     this.watcher.subscribe((change, session) => {
@@ -158,9 +167,11 @@ export class Game {
       const gate = this.interiorParts?.gate;
       if (change.kind === 'signedIn') {
         gate?.setLocked(false);
+        sounds.play('chime');
         this.hud.toast(`Checked in as ${change.session.user.name}. The security gate is open.`);
       } else if (change.kind === 'signedOut') {
         gate?.setLocked(true);
+        sounds.play('locked');
         void this.onSignedOut(change.reason);
       }
     });
@@ -231,6 +242,10 @@ export class Game {
 
     const target = this.busy ? null : pickInteractable(level.interactables, p, level.player.facing);
     this.prompt.update(target, this.camera, this.canvas, this.projected);
+    if ((target?.id ?? null) !== this.lastTargetId) {
+      this.lastTargetId = target?.id ?? null;
+      this.greetIfStaff(target);
+    }
 
     this.walked += before.distanceTo(level.player.position);
     if (this.walked > 4) this.hud.dismissHint();
@@ -278,7 +293,7 @@ export class Game {
   }
 
   /** Make `level` the one being played, with the player at `spawn` (or where they are). */
-  private activate(level: Level, spawn: Spawn | null, cameraYaw = spawn?.facing ?? 0) {
+  private activate(level: Level, spawn: Spawn | null, cameraYaw = yawBehind(spawn?.facing ?? 0)) {
     this.active = level;
     level.scene.add(this.character.root, this.marker.mesh);
     if (spawn) level.player.teleport(spawn.x, spawn.y, spawn.z, spawn.facing);
@@ -300,6 +315,7 @@ export class Game {
     this.setBusy(true);
     this.active.player.setWalkTarget(null);
     from.open();
+    sounds.play('door');
     await wait(reduced ? 0 : DOOR_SWING_MS);
     await this.fade.to(1, FADE_MS, reduced);
     from.close();
@@ -382,7 +398,7 @@ export class Game {
     if (!station) return;
     const spot = stationSpot(station.def);
     const facing = station.def.facing + Math.PI; // face the desk
-    await this.travel(inside.level, { x: spot.x, y: 0, z: spot.z, facing }, facing);
+    await this.travel(inside.level, { x: spot.x, y: 0, z: spot.z, facing }, yawBehind(facing));
     await this.talkTo(station);
   }
 
@@ -397,8 +413,16 @@ export class Game {
     this.setBusy(false);
   }
 
+  /** Staff wave when you walk up to their station. */
+  private greetIfStaff(target: Interactable | null) {
+    if (!target?.id.startsWith('station:')) return;
+    const id = target.id.slice('station:'.length);
+    this.interiorParts?.stations.find((s) => s.def.id === id)?.npc?.greet();
+  }
+
   private bumpGate() {
     this.interiorParts?.gate.bump();
+    sounds.play('locked');
     this.hud.toast('The gate is locked. Please check in at the front desk first.');
   }
 
@@ -416,7 +440,7 @@ export class Game {
         LOBBY_RETURN.z,
         LOBBY_RETURN.facing,
       );
-      parts.level.follow.reset(LOBBY_RETURN.facing);
+      parts.level.follow.reset(yawBehind(LOBBY_RETURN.facing));
       for (const trigger of parts.level.triggers)
         trigger.markInside({ x: LOBBY_RETURN.x, z: LOBBY_RETURN.z });
       this.renderNow(); // a dialogue may be open, which pauses the normal frame loop

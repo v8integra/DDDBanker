@@ -4,7 +4,16 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', 'apps/api/src/generated/**', 'test-results/**', 'playwright-report/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      'apps/api/src/generated/**',
+      'test-results/**',
+      'playwright-report/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

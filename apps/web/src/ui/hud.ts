@@ -1,4 +1,5 @@
 import type { SessionInfo } from '@dddbanker/shared';
+import { sounds } from '../audio/sounds';
 import { h } from './dialogs';
 
 /**
@@ -14,6 +15,8 @@ export class Hud {
 
   private readonly bell: HTMLButtonElement;
   private readonly badge: HTMLElement;
+  /** Unread count last seen while checked in; null right after checking in. */
+  private lastUnread: number | null = null;
 
   constructor(handlers: {
     onMenu: () => void;
@@ -147,6 +150,9 @@ export class Hud {
     this.badge.hidden = unread === 0;
     this.badge.textContent = unread > 9 ? '9+' : String(unread);
     this.bell.setAttribute('aria-label', unread ? `Notices, ${unread} unread` : 'Notices');
+    // A soft ping when a new notice arrives (the badge shows it too).
+    if (this.lastUnread !== null && unread > this.lastUnread) sounds.play('notify');
+    this.lastUnread = session?.authenticated ? unread : null;
   }
 
   /** Read a message to screen-reader users without moving focus. */

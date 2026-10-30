@@ -82,6 +82,14 @@ export function turnToward(current: number, target: number, maxStep: number) {
 }
 
 /** Heading (rotation about Y) for a direction on the ground. 0 faces +Z. */
+/**
+ * Camera yaw that puts the camera behind someone with this heading. A heading
+ * looks along (sin h, cos h) but a yaw along (-sin y, cos y), hence the sign.
+ */
+export function yawBehind(heading: number) {
+  return wrapAngle(-heading);
+}
+
 export function headingOf(dx: number, dz: number) {
   return Math.atan2(dx, dz);
 }

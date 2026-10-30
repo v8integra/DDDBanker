@@ -1,5 +1,7 @@
+import '../boot';
 import { BANK, type AccountSummary, type SessionInfo } from '@dddbanker/shared';
 import { ApiClient } from '../api/client';
+import { sounds } from '../audio/sounds';
 import { SessionWatcher } from '../auth/sessionWatcher';
 import { SettingsStore, defaultSettings, type Settings } from '../settings/settings';
 import { helpDesk, notificationsWindow } from '../stations/banking/help';
@@ -36,6 +38,7 @@ function applyDocumentSettings(s: Settings) {
   root.dataset.contrast = s.highContrast ? 'high' : 'normal';
   root.dataset.reducedMotion = String(s.reducedMotion);
   root.dataset.statusColors = s.statusColors;
+  sounds.configure(s);
 }
 
 const media = (q: string) => window.matchMedia(q).matches;

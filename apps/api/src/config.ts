@@ -19,6 +19,11 @@ const envSchema = z.object({
   SESSION_ABSOLUTE_HOURS: z.coerce.number().int().positive().default(12),
   LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(5),
   LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
+  /**
+   * Folder with the built web app (apps/web/dist). When set, the API serves it
+   * too, so the site and API share one origin. Leave unset in development.
+   */
+  WEB_DIST: z.string().min(1).optional(),
 });
 
 export type Config = z.infer<typeof envSchema> & {
@@ -31,6 +36,12 @@ export type Config = z.infer<typeof envSchema> & {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = envSchema.parse(env);
+  if (parsed.NODE_ENV === 'production') {
+    if (parsed.DEV_TOOLS)
+      throw new Error('DEV_TOOLS must be off in production (it can move the bank clock).');
+    if (!parsed.RATE_LIMITS_ENABLED)
+      throw new Error('RATE_LIMITS_ENABLED must be on in production.');
+  }
   const secureCookies = parsed.NODE_ENV === 'production';
   return {
     ...parsed,

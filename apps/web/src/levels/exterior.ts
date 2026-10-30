@@ -6,6 +6,7 @@ import type { Character } from '../player/character';
 import { clampToBounds } from '../player/steering';
 import { layout, palette } from '../theme';
 import { buildBank } from '../world/bank';
+import { StreetLighting } from '../world/lighting';
 import { buildNeighbors, buildStreet } from '../world/street';
 import { addSun, levelBase, type Level } from './level';
 
@@ -35,9 +36,11 @@ export async function buildExteriorLevel(
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(palette.sky);
   scene.fog = new THREE.Fog(palette.fog, 32, 85);
-  scene.add(new THREE.HemisphereLight(palette.hemiSky, palette.hemiGround, 1.4));
+  const hemi = new THREE.HemisphereLight(palette.hemiSky, palette.hemiGround, 1.4);
+  scene.add(hemi);
   // Sun from the street side, so the bank's facade is lit.
   const sun = addSun(scene, palette.sun, 2.4, [14, 26, -18], [0, 0, 0], 30);
+  const lighting = new StreetLighting(scene, hemi, sun);
 
   const base = await levelBase(character, camera, EXTERIOR_SPAWN);
   const root = new THREE.Group();
@@ -98,5 +101,5 @@ export async function buildExteriorLevel(
     locationAt: () => 'Bramblewood Street',
     update: (dt, reducedMotion) => door.update(dt, reducedMotion),
   };
-  return { level, door };
+  return { level, door, lighting };
 }

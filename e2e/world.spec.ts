@@ -1,18 +1,9 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, expectNoAxeViolations, test } from './fixtures';
 
 // The 3D page: axe covers the HTML around the canvas (HUD, menus, windows).
 // The canvas itself is described by its aria-label; the classic view is the
 // full non-3D alternative.
-
-async function expectNoAxeViolations(page: Page) {
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
-  expect(
-    results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`),
-  ).toEqual([]);
-}
 
 async function openWorld(page: Page) {
   await page.goto('/');
@@ -56,5 +47,57 @@ test.describe('3D view', () => {
     await expect(travel).toContainText('Check-In');
     await expect(travel).toContainText('Teller');
     await expectNoAxeViolations(page);
+  });
+
+  test('evening lighting and sounds follow Settings', async ({ page }) => {
+    // Count notes played instead of making real noise.
+    await page.addInitScript(() => {
+      const w = window as unknown as { notes: number; AudioContext: unknown };
+      w.notes = 0;
+      const Real = window.AudioContext;
+      w.AudioContext = class extends Real {
+        override createOscillator() {
+          w.notes++;
+          return super.createOscillator();
+        }
+      };
+    });
+    await page.goto('/?debug');
+    await expect(page.locator('#loading')).toHaveClass(/loading--done/, { timeout: 45_000 });
+    await page.locator('#game').focus();
+    const notes = () => page.evaluate(() => (window as unknown as { notes: number }).notes);
+
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(notes).toBeGreaterThan(0);
+
+    await page.locator('dialog[open]').last().getByRole('button', { name: 'Settings' }).click();
+    await page.getByLabel('Time of day').selectOption('evening');
+    const street = () =>
+      page.evaluate(() => {
+        type Scene = {
+          background: { getHexString(): string };
+          getObjectByName(n: string): { children: unknown[] };
+        };
+        const g = (
+          window as unknown as { __game: { game: { exterior: { level: { scene: Scene } } } } }
+        ).__game;
+        const scene = g.game.exterior.level.scene;
+        return {
+          sky: scene.background.getHexString(),
+          lamps: scene.getObjectByName('street-lamps')!.children.length,
+        };
+      });
+    await expect.poll(street).toEqual({ sky: '47507f', lamps: 7 });
+    await page.getByLabel('Graphics quality').selectOption('low');
+    await expect.poll(street).toEqual({ sky: '47507f', lamps: 0 });
+
+    await page.getByLabel('Mute all sounds').check();
+    await expect(page.getByLabel('Overall volume')).toBeDisabled();
+    const before = await notes();
+    await page.getByRole('button', { name: 'Done' }).click();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowUp');
+    expect(await notes()).toBe(before);
   });
 });
