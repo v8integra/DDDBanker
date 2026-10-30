@@ -7,7 +7,7 @@ import { transferBetweenOwnAccounts } from '../transfers/transfers';
 import { rateLimit } from './rate-limits';
 
 export function transferRoutes(deps: AppDeps): FastifyPluginAsync {
-  const { db, clock } = deps;
+  const { db, bank: clock } = deps;
 
   return async (app) => {
     app.post(

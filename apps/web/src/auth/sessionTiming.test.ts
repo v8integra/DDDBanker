@@ -10,6 +10,7 @@ const signedIn = (id: string, serverTime: string, idleExpiresAt: string): Sessio
   absoluteExpiresAt: '2026-01-02T00:00:00Z',
   serverTime,
   unreadNotifications: 0,
+  bankTime: serverTime,
 });
 const out: SessionInfo = { authenticated: false };
 

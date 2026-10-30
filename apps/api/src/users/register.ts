@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { openAccount } from '../accounts/accounts';
 import { issueDebitCard } from '../banking/cards';
 import { hashPassword } from '../auth/passwords';
-import type { Db } from '../db';
+import type { Db, Tx } from '../db';
 import { isUniqueViolation } from '../db';
 import { AppError } from '../errors';
 import { postTransaction } from '../ledger/ledger';
@@ -14,6 +14,30 @@ export interface RegisterOptions {
   at: Date;
   /** Fixed score for seeds and tests; otherwise random in the simulated 580-820 range. */
   creditScore?: number;
+}
+
+/** Checking (with a debit card), savings, and the welcome bonus. Also used by the dev reset. */
+export async function openStarterAccounts(tx: Tx, userId: string, at: Date) {
+  const checking = await openAccount(tx, { userId, type: 'CHECKING', at });
+  await issueDebitCard(tx, checking.id, at);
+  await openAccount(tx, { userId, type: 'SAVINGS', at });
+  await postTransaction(tx, {
+    type: 'WELCOME_BONUS',
+    description: 'Welcome bonus',
+    at,
+    entries: [
+      {
+        accountId: await getSystemAccountId(tx, 'WELCOME_BONUS'),
+        amountCents: -WELCOME_BONUS_CENTS,
+        description: `Welcome bonus to customer ${userId}`,
+      },
+      {
+        accountId: checking.id,
+        amountCents: WELCOME_BONUS_CENTS,
+        description: 'Welcome to the Bank of Bramblewood!',
+      },
+    ],
+  });
 }
 
 /** Create a customer with checking + savings and the welcome bonus, all-or-nothing. */
@@ -30,28 +54,7 @@ export async function registerUser(
       const user = await tx.user.create({
         data: { email: input.email, passwordHash, name: input.name, creditScore, createdAt: at },
       });
-      const checking = await openAccount(tx, { userId: user.id, type: 'CHECKING', at });
-      await issueDebitCard(tx, checking.id, at);
-      await openAccount(tx, { userId: user.id, type: 'SAVINGS', at });
-
-      await postTransaction(tx, {
-        type: 'WELCOME_BONUS',
-        description: 'Welcome bonus',
-        at,
-        entries: [
-          {
-            accountId: await getSystemAccountId(tx, 'WELCOME_BONUS'),
-            amountCents: -WELCOME_BONUS_CENTS,
-            description: `Welcome bonus to ${user.email}`,
-          },
-          {
-            accountId: checking.id,
-            amountCents: WELCOME_BONUS_CENTS,
-            description: 'Welcome to the Bank of Bramblewood!',
-          },
-        ],
-      });
-
+      await openStarterAccounts(tx, user.id, at);
       return { id: user.id, email: user.email, name: user.name };
     });
   } catch (err) {

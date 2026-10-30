@@ -9,6 +9,8 @@ import { BANK } from '@dddbanker/shared';
 import { demoPurchase, issueDebitCard } from '../src/banking/cards';
 import { addPayee, createScheduledPayment, payBill } from '../src/banking/payments';
 import { createDb } from '../src/db';
+import { closeStatements, payCreditCard } from '../src/lending/creditCards';
+import { acceptOffer, applyForCredit, billLoans } from '../src/lending/loans';
 import { postTransaction } from '../src/ledger/ledger';
 import { getSystemAccountId } from '../src/ledger/system-accounts';
 import { transferBetweenOwnAccounts } from '../src/transfers/transfers';
@@ -147,5 +149,106 @@ console.log('Seeding demo customers…');
 for (const user of DEMO_USERS) await seedUser(user);
 await backfillCards();
 for (const user of DEMO_USERS) await seedBanking(user.email);
+await seedLending(DEMO_USERS[0]!.email);
+
+/**
+ * Robin gets a Bramble credit card with two months of history and an auto
+ * loan about 14 months in, built with the real services on backdated days
+ * so every balance, statement and payment is consistent.
+ */
+async function seedLending(email: string) {
+  const user = await db.user.findUniqueOrThrow({ where: { email }, include: { accounts: true } });
+  if (await db.loanApplication.count({ where: { userId: user.id } })) return;
+  const checking = user.accounts.find((a) => a.type === 'CHECKING')!;
+  const income = { annualIncomeCents: 7_200_000, monthlyDebtCents: 0 };
+
+  // A bonus deposit so the car loan's down payment and past payments are covered.
+  await db.$transaction(async (tx) =>
+    postTransaction(tx, {
+      type: 'DEPOSIT',
+      description: 'Payroll deposit',
+      at: daysAgo(430),
+      entries: [
+        {
+          accountId: await getSystemAccountId(tx, 'EXTERNAL_CLEARING'),
+          amountCents: -1_400_000n,
+          description: `Bonus for ${email}`,
+        },
+        { accountId: checking.id, amountCents: 1_400_000n, description: 'Payroll: annual bonus' },
+      ],
+    }),
+  );
+
+  // Auto loan, opened ~14 months ago with autopay, then billed month by month.
+  const opened = daysAgo(425);
+  const auto = await applyForCredit(
+    db,
+    user.id,
+    {
+      product: 'AUTO',
+      priceCents: 1_850_000,
+      downPaymentCents: 250_000,
+      termMonths: 60,
+      vehicleYear: opened.getUTCFullYear() - 1,
+      ...income,
+    },
+    opened,
+  );
+  await db.$transaction((tx) =>
+    acceptOffer(
+      tx,
+      user.id,
+      auto.id,
+      { autopayFromAccountId: checking.id, downPaymentFromAccountId: checking.id },
+      opened,
+    ),
+  );
+
+  // Credit card, opened ~70 days ago. Purchases and a payment happen on
+  // their own days below, in date order with the statements.
+  const cardOpened = daysAgo(70);
+  const cardApp = await applyForCredit(
+    db,
+    user.id,
+    { product: 'CREDIT_CARD', ...income },
+    cardOpened,
+  );
+  const { accountId: cardAccountId } = await db.$transaction((tx) =>
+    acceptOffer(tx, user.id, cardApp.id, {}, cardOpened),
+  );
+  const card = await db.card.findFirstOrThrow({ where: { accountId: cardAccountId } });
+  const purchases = new Map<number, number>([
+    [66, 5_640],
+    [58, 2_199],
+    [41, 12_830],
+    [33, 4_475],
+    [19, 3_310],
+    [9, 7_725],
+  ]);
+
+  // Play the past days in order: that day's card activity, then loan bills (autopay) and statements.
+  for (let n = 425; n >= 1; n--) {
+    const d = daysAgo(n);
+    const day = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    const at = new Date(day.getTime() + 9 * 3_600_000);
+    const cents = purchases.get(n);
+    if (cents) await db.$transaction((tx) => demoPurchase(tx, user.id, card.id, cents, at));
+    if (n === 30) {
+      await db.$transaction((tx) =>
+        payCreditCard(
+          tx,
+          user.id,
+          cardAccountId,
+          { fromAccountId: checking.id, amountCents: 5_000 },
+          at,
+        ),
+      );
+    }
+    await billLoans(db, new Date(day.getTime() + 86_399_999), at);
+    await closeStatements(db, day, at);
+  }
+  console.log(`  ${email}: auto loan (14 months in) and a Bramble credit card with statements`);
+}
+
 console.log(`Done. Sign in with any demo email and password "${DEMO_PASSWORD}".`);
 await db.$disconnect();

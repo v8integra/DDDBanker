@@ -22,11 +22,15 @@ export const MERCHANTS = [
   'Puddle Jump Toys',
 ];
 
-export async function issueDebitCard(tx: Tx, accountId: string, at: Date) {
+export function issueDebitCard(tx: Tx, accountId: string, at: Date) {
+  return issueCard(tx, accountId, 'DEBIT', at);
+}
+
+export async function issueCard(tx: Tx, accountId: string, type: 'DEBIT' | 'CREDIT', at: Date) {
   return tx.card.create({
     data: {
       accountId,
-      type: 'DEBIT',
+      type,
       last4: String(randomInt(0, 10_000)).padStart(4, '0'),
       expiryMonth: at.getUTCMonth() + 1,
       expiryYear: at.getUTCFullYear() + 4,
@@ -98,7 +102,7 @@ export async function changeCardStatus(
           ? `Card ending ${card.last4} is locked. Purchases will be declined until you unlock it.`
           : `Card ending ${card.last4} is unlocked and ready to use.`;
     } else {
-      const fresh = await issueDebitCard(tx, card.accountId, at);
+      const fresh = await issueCard(tx, card.accountId, card.type, at);
       await tx.card.update({
         where: { id: card.id },
         data: {
@@ -159,7 +163,15 @@ export async function demoPurchase(
       `It would go over the card's daily spending limit of ${formatCents(toCents(card.spendingLimitCents))}.`,
     );
   }
-  if (card.account.balanceCents < BigInt(amountCents)) {
+  if (card.account.type === 'CREDIT_CARD') {
+    // Credit: what's left of the limit (balance is negative when owed).
+    const available = (card.account.creditLimitCents ?? 0n) + card.account.balanceCents;
+    if (available < BigInt(amountCents)) {
+      return decline(
+        `It would go over your credit limit. Available credit: ${formatCents(toCents(available > 0n ? available : 0n))}.`,
+      );
+    }
+  } else if (card.account.balanceCents < BigInt(amountCents)) {
     return decline(`There isn't enough money in ${card.account.nickname}.`);
   }
 

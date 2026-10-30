@@ -21,7 +21,14 @@ export type AuditAction =
   | 'PASSWORD_CHANGED'
   | 'TWO_FACTOR_ENABLED'
   | 'TWO_FACTOR_DISABLED'
-  | 'SESSION_REVOKED';
+  | 'SESSION_REVOKED'
+  | 'APPLICATION'
+  | 'LOAN_ACCEPTED'
+  | 'LOAN_PAYMENT'
+  | 'POLICY_BOUND'
+  | 'POLICY_CANCELLED'
+  | 'DEV_CLOCK'
+  | 'DEV_RESET';
 
 export interface AuditInput {
   userId: string | null;

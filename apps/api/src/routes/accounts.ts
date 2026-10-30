@@ -15,7 +15,7 @@ import { toCents } from '../money';
 const idParams = z.object({ id: z.string().min(1).max(64) });
 
 export function accountRoutes(deps: AppDeps): FastifyPluginAsync {
-  const { db, clock } = deps;
+  const { db, bank: clock } = deps;
 
   return async (app) => {
     app.addHook('preHandler', requireAuth(deps));

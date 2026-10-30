@@ -54,4 +54,6 @@ export type SessionInfo =
       serverTime: string;
       /** Unread notifications, so the HUD bell can update without extending the session. */
       unreadNotifications: number;
+      /** The bank's simulated date/time (moves with the dev time machine). Use it for money dates. */
+      bankTime: string;
     };

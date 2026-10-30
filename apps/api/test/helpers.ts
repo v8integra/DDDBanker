@@ -4,6 +4,7 @@ import type { FastifyInstance, InjectOptions } from 'fastify';
 import { inject } from 'vitest';
 import { CSRF_HEADER, IDEMPOTENCY_HEADER, type SessionInfo } from '@dddbanker/shared';
 import { buildApp } from '../src/app';
+import { BankClock } from '../src/bank/clock';
 import type { Clock } from '../src/clock';
 import { loadConfig } from '../src/config';
 import { createDb, type Db } from '../src/db';
@@ -39,7 +40,9 @@ export async function createTestContext(env: Record<string, string> = {}): Promi
   });
   const db = createDb(config.DATABASE_URL);
   const clock = new TestClock();
-  const app = await buildApp({ config, db, clock });
+  // Bank time follows the test clock (offset 0) unless a test moves it.
+  const bank = new BankClock(clock);
+  const app = await buildApp({ config, db, clock, bank });
 
   return {
     app,

@@ -12,6 +12,8 @@ import { cardsDesk } from './banking/cards';
 import { helpDesk, notificationsWindow } from './banking/help';
 import { speakerOf, type BankContext } from './banking/kit';
 import { paymentsDesk } from './banking/payments';
+import { insuranceDesk } from './banking/insurance';
+import { lendingDesk } from './banking/lending';
 import { securityDesk } from './banking/security';
 import { openAccountFlow, showBalances, tellerDesk } from './banking/teller';
 import type { StationDef } from './stations';
@@ -30,7 +32,7 @@ const ACCOUNT_TYPE_LABEL: Record<string, string> = {
   PERSONAL_LOAN: 'Personal loan',
 };
 
-/** What happens when you talk to each station. The lending and insurance desks arrive in Phase 6. */
+/** What happens when you talk to each station. */
 export async function runStation(def: StationDef, ctx: StationContext) {
   switch (def.id) {
     case 'checkin':
@@ -51,6 +53,14 @@ export async function runStation(def: StationDef, ctx: StationContext) {
       return helpDesk(def, ctx);
     case 'savings':
       return savingsDesk(def, ctx);
+    case 'autoLoans':
+      return lendingDesk(def, ctx, 'AUTO');
+    case 'homeLoans':
+      return lendingDesk(def, ctx, 'MORTGAGE');
+    case 'personalLoans':
+      return lendingDesk(def, ctx, 'PERSONAL');
+    case 'insurance':
+      return insuranceDesk(def, ctx);
     case 'notifications':
       return notificationsWindow(ctx);
     default: {

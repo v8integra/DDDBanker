@@ -4,3 +4,5 @@ export * from './schemas/auth';
 export * from './schemas/accounts';
 export * from './schemas/errors';
 export * from './schemas/banking';
+export * from './amortization';
+export * from './schemas/lending';

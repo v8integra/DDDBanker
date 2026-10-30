@@ -1,7 +1,184 @@
-import { formatCents, type CardView } from '@dddbanker/shared';
+import { formatCents, type CardView, type CreditCardAccountView } from '@dddbanker/shared';
 import { newIdempotencyKey } from '../../api/client';
+import { balanceCell } from '../../ui/windows/money';
+import { FormCancelled } from '../../ui/windows/windows';
 import type { StationDef } from '../stations';
-import { attempt, speakerOf, type BankContext } from './kit';
+import {
+  accountOptions,
+  attempt,
+  emptyErrors,
+  formatDate,
+  isDepositAccount,
+  loadAccounts,
+  percent,
+  readAmount,
+  speakerOf,
+  type BankContext,
+} from './kit';
+import { offersFlow, showDecision } from './lending';
+
+/** Bramble credit card: apply if there's none yet, otherwise view, pay, and see statements. */
+async function creditCardFlow(ctx: BankContext) {
+  const cards = await attempt(ctx, () => ctx.api.getCreditCards());
+  if (!cards) return;
+  if (cards.length === 0) {
+    const apps = (await attempt(ctx, () => ctx.api.getApplications())) ?? [];
+    if (apps.some((a) => a.product === 'CREDIT_CARD' && a.status === 'OFFER')) {
+      await offersFlow(ctx, 'CREDIT_CARD');
+      return;
+    }
+    const app = await ctx.ui.form({
+      title: 'Apply: Bramble Credit Card',
+      intro: [
+        'No annual fee, and pay in full each month to never pay interest. You get an answer right away.',
+      ],
+      fields: [
+        {
+          name: 'income',
+          label: 'Yearly income before taxes',
+          type: 'money',
+          hint: 'Make it up! This is a demo.',
+        },
+        {
+          name: 'debts',
+          label: 'Other monthly debt payments',
+          type: 'money',
+          value: '0',
+          hint: 'Not rent. 0 is fine.',
+        },
+      ],
+      submitLabel: 'Apply',
+      validate: (v) => {
+        const errors = emptyErrors();
+        readAmount(v, 'income', errors);
+        return errors;
+      },
+      submit: (v) =>
+        ctx.api.apply({
+          product: 'CREDIT_CARD',
+          annualIncomeCents: readAmount(v, 'income', emptyErrors())!,
+          monthlyDebtCents:
+            v.debts?.trim() && v.debts.trim() !== '0'
+              ? (readAmount(v, 'debts', emptyErrors()) ?? 0)
+              : 0,
+        }),
+    });
+    if (app) await showDecision(ctx, app);
+    return;
+  }
+
+  let card: CreditCardAccountView | undefined = cards[0];
+  while (card) {
+    const s = card.latestStatement;
+    const pick = await ctx.ui.table<'pay' | 'statements' | 'done'>({
+      title: `Bramble Card ${card.cardLast4 ? `••••${card.cardLast4}` : card.maskedNumber}`,
+      caption: 'Credit card summary',
+      columns: [{ label: 'Detail' }, { label: 'Value', align: 'end' }],
+      rows: [
+        ['Balance owed', balanceCell(card.balanceOwedCents)],
+        ['Available credit', balanceCell(card.availableCents)],
+        ['Credit limit', balanceCell(card.creditLimitCents)],
+        ['APR', percent(card.aprBps)],
+        ...(s
+          ? ([
+              ['Last statement', balanceCell(s.statementBalanceCents)],
+              ['Minimum due', balanceCell(s.minimumDueCents)],
+              ['Due by', formatDate(s.dueDate)],
+              ['Paid since statement', balanceCell(s.paidCents)],
+            ] as [string, ReturnType<typeof balanceCell> | string][])
+          : [
+              ['Statements', `First one closes on day ${card.statementDay} of the month`] as [
+                string,
+                string,
+              ],
+            ]),
+      ],
+      note: 'Pay the statement balance in full by the due date and no interest is charged.',
+      choices: [
+        ...(card.balanceOwedCents > 0 ? [{ value: 'pay' as const, label: 'Make a payment' }] : []),
+        { value: 'statements', label: 'Statements' },
+        { value: 'done', label: 'Done' },
+      ],
+    });
+    if (pick === 'pay') card = (await payCardFlow(ctx, card)) ?? card;
+    else if (pick === 'statements') await statementsFlow(ctx, card);
+    else return;
+  }
+}
+
+async function payCardFlow(ctx: BankContext, card: CreditCardAccountView) {
+  const accounts = (await loadAccounts(ctx))?.filter(isDepositAccount);
+  if (!accounts) return null;
+  const s = card.latestStatement;
+  const statementLeft = s ? Math.max(0, s.statementBalanceCents - s.paidCents) : 0;
+  const suggested = Math.min(card.balanceOwedCents, statementLeft || card.balanceOwedCents);
+  const key = newIdempotencyKey();
+  const result = await ctx.ui.form({
+    title: 'Card Payment',
+    fields: [
+      { name: 'from', label: 'Pay from', type: 'select', options: accountOptions(accounts) },
+      {
+        name: 'amount',
+        label: 'Amount',
+        type: 'money',
+        value: (suggested / 100).toFixed(2),
+        hint: `${s ? `Minimum ${formatCents(s.minimumDueCents)} · statement ${formatCents(s.statementBalanceCents)} · ` : ''}everything owed ${formatCents(card.balanceOwedCents)}.`,
+      },
+    ],
+    submitLabel: 'Continue',
+    validate: (v) => {
+      const errors = emptyErrors();
+      readAmount(v, 'amount', errors);
+      return errors;
+    },
+    submit: async (v) => {
+      const amountCents = readAmount(v, 'amount', emptyErrors())!;
+      if (
+        !(await ctx.ui.confirm({
+          title: 'Confirm Payment',
+          text: [`Pay ${formatCents(amountCents)} toward your Bramble card?`],
+          confirmLabel: 'Yes, pay it',
+        }))
+      ) {
+        throw new FormCancelled();
+      }
+      return ctx.api.payCreditCard(card.accountId, v.from!, amountCents, key);
+    },
+  });
+  if (result)
+    await ctx.ui.result({
+      title: 'Payment Received',
+      tone: 'success',
+      lines: [`Thank you! You now owe ${formatCents(result.balanceOwedCents)}.`],
+    });
+  return result;
+}
+
+async function statementsFlow(ctx: BankContext, card: CreditCardAccountView) {
+  const statements = await attempt(ctx, () => ctx.api.getCardStatements(card.accountId));
+  if (!statements) return;
+  await ctx.ui.table({
+    title: 'Card Statements',
+    caption: 'Credit card statements, newest first',
+    columns: [
+      { label: 'Closed' },
+      { label: 'Balance', align: 'end' },
+      { label: 'Minimum', align: 'end' },
+      { label: 'Due' },
+      { label: 'Interest', align: 'end' },
+      { label: 'Fees', align: 'end' },
+    ],
+    rows: statements.map((s) => [
+      formatDate(s.periodEnd),
+      balanceCell(s.statementBalanceCents),
+      balanceCell(s.minimumDueCents),
+      formatDate(s.dueDate),
+      balanceCell(s.interestCents),
+      balanceCell(s.feeCents),
+    ]),
+    empty: 'No statements yet. The first closes about a month after you open the card.',
+  });
+}
 
 const STATUS_LABEL: Record<CardView['status'], string> = {
   ACTIVE: '✓ Active',
@@ -21,19 +198,14 @@ export async function cardsDesk(def: StationDef, ctx: BankContext) {
       choices: [
         { value: 'view', label: 'Show my cards' },
         { value: 'manage', label: 'Lock, replace, or try a card' },
-        { value: 'credit', label: 'Apply for a credit card' },
+        { value: 'credit', label: 'Bramble credit card' },
         { value: 'bye', label: 'Never mind' },
       ],
     });
     if (!choice || choice === 'bye') return;
     greeting = 'Anything else about your cards?';
     if (choice === 'credit') {
-      await ctx.ui.dialogue({
-        ...staff,
-        lines: [
-          'Our Bramble credit card launches with the lending desks in the next update. I will save you a seat!',
-        ],
-      });
+      await creditCardFlow(ctx);
       continue;
     }
     const cards = await attempt(ctx, () => ctx.api.getCards());

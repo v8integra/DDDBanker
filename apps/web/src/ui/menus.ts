@@ -62,7 +62,12 @@ export function createHelpDialog() {
   );
 }
 
-export function createPauseDialog(actions: { onSettings: () => void; onHelp: () => void }) {
+export function createPauseDialog(actions: {
+  onSettings: () => void;
+  onHelp: () => void;
+  /** Dev only (?debug): the bank time machine. */
+  onTimeMachine?: () => void;
+}) {
   const menu = h(
     'div',
     { class: 'retro-menu', role: 'group', 'aria-label': 'Pause menu' },
@@ -73,6 +78,13 @@ export function createPauseDialog(actions: { onSettings: () => void; onHelp: () 
     ),
     h('button', { type: 'button', class: 'retro-option', onclick: actions.onSettings }, 'Settings'),
     h('button', { type: 'button', class: 'retro-option', onclick: actions.onHelp }, 'Controls'),
+    actions.onTimeMachine
+      ? h(
+          'button',
+          { type: 'button', class: 'retro-option', onclick: actions.onTimeMachine },
+          'Time machine (dev)',
+        )
+      : null,
   );
   return retroDialog(
     'pause-dialog',
@@ -233,12 +245,18 @@ export function createSettingsDialog(store: SettingsStore) {
 }
 
 /** Build the pause, settings, and help windows and wire them into a DialogStack. */
-export function createMenus(store: SettingsStore, dialogs: DialogStack, mount: HTMLElement) {
+export function createMenus(
+  store: SettingsStore,
+  dialogs: DialogStack,
+  mount: HTMLElement,
+  extras: { onTimeMachine?: () => void } = {},
+) {
   const settings = createSettingsDialog(store);
   const help = createHelpDialog();
   const pause = createPauseDialog({
     onSettings: () => dialogs.open(settings),
     onHelp: () => dialogs.open(help),
+    ...extras,
   });
   mount.append(pause, settings, help);
 

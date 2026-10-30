@@ -130,7 +130,10 @@ export function tomorrow(serverTime: string) {
   return d.toISOString().slice(0, 10);
 }
 
+/** The bank's date and time (it moves with the dev time machine). Use it for every money date. */
 export function serverNow(ctx: BankContext) {
   const s = ctx.watcher.session;
-  return s?.authenticated ? s.serverTime : new Date().toISOString();
+  return s?.authenticated ? s.bankTime : new Date().toISOString();
 }
+
+export const percent = (bps: number) => `${(bps / 100).toFixed(2)}%`;

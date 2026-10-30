@@ -13,6 +13,8 @@ const envSchema = z.object({
   /** Set when running behind a reverse proxy so request IPs are read from X-Forwarded-For. */
   TRUST_PROXY: flag.default(false),
   RATE_LIMITS_ENABLED: flag.default(true),
+  /** Time machine and demo reset (/dev/*). Defaults to on, except in production. */
+  DEV_TOOLS: flag.optional(),
   SESSION_IDLE_MINUTES: z.coerce.number().int().positive().default(15),
   SESSION_ABSOLUTE_HOURS: z.coerce.number().int().positive().default(12),
   LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(5),
@@ -23,6 +25,8 @@ export type Config = z.infer<typeof envSchema> & {
   /** Secure cookies and HSTS. On in production only. */
   secureCookies: boolean;
   sessionCookieName: string;
+  /** Resolved DEV_TOOLS: the time machine and demo reset are available. */
+  devTools: boolean;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -33,5 +37,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     secureCookies,
     // __Host- cookies must be Secure, so the prefix is production-only.
     sessionCookieName: secureCookies ? '__Host-bb_session' : 'bb_session',
+    devTools: parsed.DEV_TOOLS ?? parsed.NODE_ENV !== 'production',
   };
 }

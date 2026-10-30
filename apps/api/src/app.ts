@@ -7,6 +7,7 @@ import type { AppDeps } from './deps';
 import { registerErrorHandling } from './errors';
 import { accountRoutes } from './routes/accounts';
 import { authRoutes } from './routes/auth';
+import { lendingRoutes } from './routes/lending';
 import { moneyRoutes } from './routes/money';
 import { serviceRoutes } from './routes/services';
 import { transferRoutes } from './routes/transfers';
@@ -55,6 +56,7 @@ export async function buildApp(deps: AppDeps) {
       await api.register(transferRoutes(deps));
       await api.register(moneyRoutes(deps));
       await api.register(serviceRoutes(deps));
+      await api.register(lendingRoutes(deps));
     },
     { prefix: API_PREFIX },
   );

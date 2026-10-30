@@ -13,6 +13,7 @@ import { Character } from '../player/character';
 import { ClickMarker } from '../player/clickMarker';
 import type { SettingsStore } from '../settings/settings';
 import { useAtm } from '../stations/banking/atm';
+import { timeMachine } from '../stations/banking/dev';
 import { notificationsWindow } from '../stations/banking/help';
 import type { BankContext } from '../stations/banking/kit';
 import { infoBoardLines, runStation } from '../stations/handlers';
@@ -73,7 +74,12 @@ export class Game {
   ) {
     this.character = new Character({ color: store.get().playerColor });
     this.input = new Input(canvas);
-    const menus = createMenus(store, this.dialogs, uiRoot);
+    const menus = createMenus(
+      store,
+      this.dialogs,
+      uiRoot,
+      DEBUG ? { onTimeMachine: () => void timeMachine(this.bank) } : {},
+    );
     this.hud = new Hud({
       onMenu: menus.openPause,
       onHelp: menus.openHelp,

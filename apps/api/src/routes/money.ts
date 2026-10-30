@@ -54,10 +54,10 @@ export function moneyRoute<S extends z.ZodType>(
     const user = currentUser(req);
     const key = readIdempotencyKey(req);
     const input = schema.parse(req.body);
-    const at = deps.clock.now();
+    const at = deps.bank.now();
     const result = await runIdempotent(
       deps.db,
-      { userId: user.id, key, scope: path, payload: input, statusCode, at },
+      { userId: user.id, key, scope: path, payload: { params: req.params, input }, statusCode, at },
       (tx) => run(tx, user, input, at, req),
     );
     if (result.replayed) reply.header('idempotent-replayed', 'true');
@@ -66,7 +66,7 @@ export function moneyRoute<S extends z.ZodType>(
 }
 
 export function moneyRoutes(deps: AppDeps): FastifyPluginAsync {
-  const { db, clock } = deps;
+  const { db, bank: clock } = deps;
 
   return async (app) => {
     // Accounts: open savings or a CD, monthly statements.

@@ -39,6 +39,9 @@ model User {
   scheduledPayments  ScheduledPayment[]
   supportTickets     SupportTicket[]
   notifications      Notification[]
+  loanApplications   LoanApplication[]
+  insuranceQuotes    InsuranceQuote[]
+  insurancePolicies  InsurancePolicy[]
 }
 
 model Session {
@@ -77,29 +80,42 @@ enum AccountStatus {
 }
 
 model Account {
-  id              String        @id @default(cuid())
+  id                     String        @id @default(cuid())
   /// Null for the bank's internal system accounts.
-  userId          String?
-  user            User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                 String?
+  user                   User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Set only on system accounts, e.g. WELCOME_BONUS.
-  systemCode      String?       @unique
-  type            AccountType
-  nickname        String
+  systemCode             String?       @unique
+  type                   AccountType
+  nickname               String
   /// Fake, generated account number.
-  number          String        @unique
-  status          AccountStatus @default(OPEN)
-  interestRateBps Int           @default(0)
+  number                 String        @unique
+  status                 AccountStatus @default(OPEN)
+  interestRateBps        Int           @default(0)
   /// Cached sum of this account's ledger entries, updated in the same DB transaction.
-  balanceCents    BigInt        @default(0)
+  balanceCents           BigInt        @default(0)
   /// CDs only.
-  termMonths      Int?
-  maturesAt       DateTime?
-  createdAt       DateTime      @default(now())
+  termMonths             Int?
+  maturesAt              DateTime?
+  /// Credit cards only.
+  creditLimitCents       BigInt?
+  /// Credit cards: day of month (1-28) statements close.
+  statementDay           Int?
+  /// Interest earned but not yet paid, in thousandths of a cent (savings and CDs).
+  accruedInterestMilli   BigInt        @default(0)
+  /// Last bank day interest was accrued for.
+  interestAccruedThrough DateTime?
+  /// YYYY-MM of the last monthly interest payout.
+  interestPostedFor      String?
+  closedAt               DateTime?
+  createdAt              DateTime      @default(now())
 
   entries       LedgerEntry[]
   cards         Card[]
-  scheduledFrom ScheduledPayment[] @relation("ScheduledFrom")
-  scheduledTo   ScheduledPayment[] @relation("ScheduledTo")
+  loan          Loan?
+  statements    CreditCardStatement[]
+  scheduledFrom ScheduledPayment[]    @relation("ScheduledFrom")
+  scheduledTo   ScheduledPayment[]    @relation("ScheduledTo")
 
   @@index([userId])
 }
@@ -303,4 +319,141 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
+}
+
+/// Small key/value store: the bank clock offset, job progress.
+model Setting {
+  key   String @id
+  value String
+}
+
+enum LendingProduct {
+  AUTO
+  MORTGAGE
+  PERSONAL
+  CREDIT_CARD
+}
+
+enum Decision {
+  APPROVED
+  DECLINED
+  COUNTER_OFFER
+}
+
+model LoanApplication {
+  id                         String         @id @default(cuid())
+  userId                     String
+  user                       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product                    LendingProduct
+  requestedAmountCents       BigInt
+  termMonths                 Int
+  /// JSON: income, debts, price, down payment, vehicle year...
+  details                    String
+  decision                   Decision
+  /// Plain-words reason for a decline or counter-offer.
+  decisionReason             String?
+  offeredAmountCents         BigInt?
+  offeredTermMonths          Int?
+  offeredRateBps             Int?
+  offeredMonthlyPaymentCents BigInt?
+  createdAt                  DateTime       @default(now())
+  expiresAt                  DateTime
+  acceptedAt                 DateTime?
+  /// The loan or credit card account opened from this application.
+  accountId                  String?
+
+  @@index([userId, createdAt])
+}
+
+enum LoanStatus {
+  ACTIVE
+  PAID_OFF
+}
+
+/// Terms of an installment loan. The linked account's balance (negative) is what's owed.
+model Loan {
+  id                   String         @id @default(cuid())
+  accountId            String         @unique
+  account              Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  product              LendingProduct
+  principalCents       BigInt
+  rateBps              Int
+  termMonths           Int
+  monthlyPaymentCents  BigInt
+  startDate            DateTime
+  nextDueDate          DateTime
+  /// Billed installments not yet paid. Paying more than this goes to principal.
+  amountDueCents       BigInt         @default(0)
+  installmentsBilled   Int            @default(0)
+  autopayFromAccountId String?
+  status               LoanStatus     @default(ACTIVE)
+  createdAt            DateTime       @default(now())
+}
+
+model CreditCardStatement {
+  id                    String   @id @default(cuid())
+  accountId             String
+  account               Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  periodStart           DateTime
+  periodEnd             DateTime
+  /// Owed at close, as a positive number.
+  statementBalanceCents BigInt
+  minimumDueCents       BigInt
+  dueDate               DateTime
+  interestCents         BigInt   @default(0)
+  feeCents              BigInt   @default(0)
+  createdAt             DateTime @default(now())
+
+  @@unique([accountId, periodEnd])
+}
+
+enum InsuranceType {
+  AUTO
+  HOME
+  RENTERS
+  LIFE
+}
+
+model InsuranceQuote {
+  id                  String        @id @default(cuid())
+  userId              String
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type                InsuranceType
+  /// JSON of what was asked (vehicle year, home value, coverage level...).
+  details             String
+  coverageCents       BigInt
+  monthlyPremiumCents BigInt
+  createdAt           DateTime      @default(now())
+  expiresAt           DateTime
+  boundAt             DateTime?
+
+  policy InsurancePolicy?
+
+  @@index([userId])
+}
+
+enum PolicyStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+model InsurancePolicy {
+  id                  String         @id @default(cuid())
+  userId              String
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quoteId             String         @unique
+  quote               InsuranceQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  type                InsuranceType
+  number              String         @unique
+  coverageCents       BigInt
+  monthlyPremiumCents BigInt
+  status              PolicyStatus   @default(ACTIVE)
+  payFromAccountId    String
+  nextPremiumDate     DateTime
+  createdAt           DateTime       @default(now())
+  cancelledAt         DateTime?
+
+  @@index([userId])
+  @@index([status, nextPremiumDate])
 }

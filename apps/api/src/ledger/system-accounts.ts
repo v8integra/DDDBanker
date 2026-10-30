@@ -6,6 +6,8 @@ export const SYSTEM_ACCOUNTS = {
   CASH_VAULT: 'Cash Vault',
   LOAN_FUNDING: 'Loan Funding',
   INTEREST_EXPENSE: 'Interest Expense',
+  INTEREST_INCOME: 'Interest Income',
+  INSURANCE: 'Bramble Mutual Insurance',
   FEES_INCOME: 'Fees Income',
   EXTERNAL_CLEARING: 'External Clearing',
 } as const;

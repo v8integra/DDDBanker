@@ -30,6 +30,17 @@ import {
   type TransferResult,
   type TwoFactorSetup,
   type WithdrawalInput,
+  type BankClockView,
+  type CalculatorResult,
+  type CreditCardAccountView,
+  type CreditStatementView,
+  type InsuranceQuoteInput,
+  type LoanApplicationInput,
+  type LoanApplicationView,
+  type LoanView,
+  type PolicyView,
+  type QuoteView,
+  type ScheduleRow,
 } from '@dddbanker/shared';
 
 /**
@@ -122,6 +133,69 @@ export class ApiClient {
     this.request<void>('POST', `/support/tickets/${encodeURIComponent(id)}/close`, {});
   getNotifications = () => this.request<NotificationView[]>('GET', '/notifications');
   markAllRead = () => this.request<void>('POST', '/notifications/read-all', {});
+
+  // ---- Lending ----
+  apply = (input: LoanApplicationInput) =>
+    this.request<LoanApplicationView>('POST', '/loan-applications', input);
+  getApplications = () => this.request<LoanApplicationView[]>('GET', '/loan-applications');
+  acceptOffer = (
+    id: string,
+    input: { autopayFromAccountId?: string; downPaymentFromAccountId?: string },
+    key: string,
+  ) =>
+    this.move<{ accountId: string; product: string }>(
+      `/loan-applications/${encodeURIComponent(id)}/accept`,
+      input,
+      key,
+    );
+  getLoans = () => this.request<LoanView[]>('GET', '/loans');
+  getSchedule = (id: string) =>
+    this.request<ScheduleRow[]>('GET', `/loans/${encodeURIComponent(id)}/schedule`);
+  payLoan = (id: string, fromAccountId: string, amountCents: number, key: string) =>
+    this.move<LoanView>(
+      `/loans/${encodeURIComponent(id)}/payments`,
+      { fromAccountId, amountCents },
+      key,
+    );
+  calculate = (
+    product: 'auto' | 'mortgage',
+    q: { priceCents: number; downPaymentCents: number; termMonths: number },
+  ) =>
+    this.request<CalculatorResult>(
+      'GET',
+      `/calculators/${product}?priceCents=${q.priceCents}&downPaymentCents=${q.downPaymentCents}&termMonths=${q.termMonths}`,
+    );
+  getCreditCards = () => this.request<CreditCardAccountView[]>('GET', '/credit-cards');
+  getCardStatements = (id: string) =>
+    this.request<CreditStatementView[]>(
+      'GET',
+      `/credit-cards/${encodeURIComponent(id)}/statements`,
+    );
+  payCreditCard = (id: string, fromAccountId: string, amountCents: number, key: string) =>
+    this.move<CreditCardAccountView>(
+      `/credit-cards/${encodeURIComponent(id)}/payments`,
+      { fromAccountId, amountCents },
+      key,
+    );
+
+  // ---- Insurance ----
+  quote = (input: InsuranceQuoteInput) =>
+    this.request<QuoteView>('POST', '/insurance/quotes', input);
+  getQuotes = () => this.request<QuoteView[]>('GET', '/insurance/quotes');
+  bindQuote = (id: string, payFromAccountId: string, key: string) =>
+    this.move<PolicyView>(
+      `/insurance/quotes/${encodeURIComponent(id)}/bind`,
+      { payFromAccountId },
+      key,
+    );
+  getPolicies = () => this.request<PolicyView[]>('GET', '/insurance/policies');
+  cancelPolicy = (id: string) =>
+    this.request<void>('POST', `/insurance/policies/${encodeURIComponent(id)}/cancel`, {});
+
+  // ---- Dev tools (?debug, outside production) ----
+  advanceClock = (body: { days?: number; months?: number }) =>
+    this.request<BankClockView>('POST', '/dev/advance-clock', body);
+  resetMyData = () => this.request<void>('POST', '/dev/reset-user', {});
 
   private async session(method: string, path: string, body?: unknown) {
     const info = await this.request<SessionInfo>(method, path, body);

@@ -118,7 +118,7 @@ export async function destroySession(
 }
 
 export async function toSessionInfo(
-  { config, clock, db }: AppDeps,
+  { config, clock, db, bank }: AppDeps,
   auth: AuthContext | null,
 ): Promise<SessionInfo> {
   if (!auth) return { authenticated: false };
@@ -134,5 +134,6 @@ export async function toSessionInfo(
     absoluteExpiresAt: auth.expiresAt.toISOString(),
     serverTime: clock.now().toISOString(),
     unreadNotifications,
+    bankTime: bank.now().toISOString(),
   };
 }

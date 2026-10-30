@@ -39,7 +39,8 @@ const cardAction = z.object({
 
 /** Cards, security, support and notifications. */
 export function serviceRoutes(deps: AppDeps): FastifyPluginAsync {
-  const { db, clock } = deps;
+  // Money dates (notices, cards, tickets) use bank time.
+  const { db, bank: clock } = deps;
 
   return async (app) => {
     app.addHook('preHandler', requireAuth(deps));
