@@ -1,7 +1,8 @@
 import { BANK } from '@dddbanker/shared';
-import { DEFAULT_BINDINGS, type Action } from '../engine/bindings';
+import { ACTIONS, canBind, rebind, resolveBindings, type Action } from '../engine/bindings';
 import {
   GRAPHICS_QUALITIES,
+  STATUS_PALETTES,
   TEXT_SCALES,
   type Settings,
   type SettingsStore,
@@ -24,40 +25,149 @@ const KEY_NAMES: Record<string, string> = {
 };
 const keyName = (code: string) => KEY_NAMES[code] ?? code.replace(/^Key/, '');
 
+export const ACTION_LABELS: Record<Action, string> = {
+  forward: 'Walk forward',
+  back: 'Walk back',
+  left: 'Walk left',
+  right: 'Walk right',
+  run: 'Run (hold)',
+  rotateLeft: 'Turn camera left',
+  rotateRight: 'Turn camera right',
+  zoomIn: 'Zoom in',
+  zoomOut: 'Zoom out',
+  interact: 'Talk / interact',
+  travel: 'Quick travel',
+  pause: 'Pause menu',
+};
+
 const CONTROL_ROWS: [Action | string[], string][] = [
-  ['forward', 'Walk forward'],
-  ['back', 'Walk back'],
-  ['left', 'Walk left'],
-  ['right', 'Walk right'],
-  ['run', 'Run (hold)'],
+  ['forward', ACTION_LABELS.forward],
+  ['back', ACTION_LABELS.back],
+  ['left', ACTION_LABELS.left],
+  ['right', ACTION_LABELS.right],
+  ['run', ACTION_LABELS.run],
   [['Click or tap the ground'], 'Walk to a spot'],
   [['Drag with mouse or finger'], 'Look around'],
-  ['rotateLeft', 'Turn camera left'],
-  ['rotateRight', 'Turn camera right'],
-  ['zoomIn', 'Zoom in'],
-  ['zoomOut', 'Zoom out'],
+  ['rotateLeft', ACTION_LABELS.rotateLeft],
+  ['rotateRight', ACTION_LABELS.rotateRight],
+  ['zoomIn', ACTION_LABELS.zoomIn],
+  ['zoomOut', ACTION_LABELS.zoomOut],
   [['Mouse wheel'], 'Zoom'],
-  ['interact', 'Talk / interact'],
-  ['pause', 'Pause menu'],
+  ['interact', ACTION_LABELS.interact],
+  ['travel', ACTION_LABELS.travel],
+  ['pause', ACTION_LABELS.pause],
 ];
 
 const closeOwnDialog = (e: Event) => (e.target as HTMLElement).closest('dialog')?.close();
+const keysOf = (codes: readonly string[]) => [...new Set(codes.map(keyName))];
 
-export function createHelpDialog() {
-  const rows = CONTROL_ROWS.map(([keys, label]) => {
-    const cells = Array.isArray(keys)
-      ? keys.map((text) => h('span', {}, text))
-      : [...new Set(DEFAULT_BINDINGS[keys].map(keyName))].map((k) => h('kbd', {}, k));
-    return h('tr', {}, h('th', { scope: 'row' }, label), h('td', {}, ...cells));
+/** The Controls window. It always shows the keys currently in use. */
+export function createHelpDialog(store: SettingsStore) {
+  const body = h('tbody', {});
+  store.subscribe((s) => {
+    const bindings = resolveBindings(s.keyBindings);
+    body.replaceChildren(
+      ...CONTROL_ROWS.map(([keys, label]) => {
+        const cells = Array.isArray(keys)
+          ? keys.map((text) => h('span', {}, text))
+          : keysOf(bindings[keys]).map((k) => h('kbd', {}, k));
+        return h('tr', {}, h('th', { scope: 'row' }, label), h('td', {}, ...cells));
+      }),
+    );
   });
   return retroDialog(
     'help-dialog',
     'Controls',
-    h('table', { class: 'controls-table' }, h('tbody', {}, ...rows)),
+    h('table', { class: 'controls-table' }, body),
     h(
       'p',
       { class: 'retro-note' },
-      'A gamepad works too: left stick walks, right stick looks, A interacts, Start pauses.',
+      'A gamepad works too: left stick walks, right stick looks, A interacts, Start pauses. Change keys in Settings.',
+    ),
+  );
+}
+
+/**
+ * The "Controls" part of Settings: each action shows its keys and a Change
+ * button that listens for the next key. Escape cancels; two actions never
+ * share a key; Escape always opens the menu.
+ */
+function controlsFieldset(store: SettingsStore, syncers: ((s: Settings) => void)[]) {
+  const status = h('p', { class: 'setting__hint', role: 'status', 'aria-live': 'polite' });
+  let stopListening: (() => void) | null = null;
+
+  const rows = ACTIONS.map((action) => {
+    const keys = h('span', { class: 'keybind__keys' });
+    const button = h(
+      'button',
+      {
+        type: 'button',
+        class: 'keybind__change',
+        'aria-label': `Change key for ${ACTION_LABELS[action]}`,
+      },
+      'Change',
+    );
+    const listen = () => {
+      stopListening?.();
+      button.textContent = 'Press a key…';
+      status.textContent = `Press the new key for ${ACTION_LABELS[action]}, or Escape to cancel.`;
+      const onKey = (e: KeyboardEvent) => {
+        // Capture phase on window: the key never reaches the game or the menus.
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.code === 'Escape') {
+          stop();
+          status.textContent = 'Cancelled.';
+          return;
+        }
+        if (!canBind(e.code)) {
+          status.textContent = `${keyName(e.code)} can't be used. Try another key, or Escape to cancel.`;
+          return;
+        }
+        stop();
+        store.update({
+          keyBindings: rebind(resolveBindings(store.get().keyBindings), action, e.code),
+        });
+        status.textContent = `${ACTION_LABELS[action]} is now ${keyName(e.code)}.`;
+        button.focus();
+      };
+      const stop = () => {
+        window.removeEventListener('keydown', onKey, true);
+        button.textContent = 'Change';
+        stopListening = null;
+      };
+      window.addEventListener('keydown', onKey, true);
+      stopListening = stop;
+    };
+    button.addEventListener('click', listen);
+    syncers.push((s) => {
+      keys.replaceChildren(
+        ...keysOf(resolveBindings(s.keyBindings)[action]).map((k) => h('kbd', {}, k)),
+      );
+    });
+    return h(
+      'div',
+      { class: 'keybind' },
+      h('span', { class: 'keybind__label' }, ACTION_LABELS[action]),
+      keys,
+      button,
+    );
+  });
+
+  return h(
+    'fieldset',
+    {},
+    h('legend', {}, 'Controls'),
+    ...rows,
+    status,
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'retro-option retro-option--quiet',
+        onclick: () => store.update({ keyBindings: {} }),
+      },
+      'Reset keys',
     ),
   );
 }
@@ -67,6 +177,7 @@ export function createPauseDialog(actions: {
   onHelp: () => void;
   /** Dev only (?debug): the bank time machine. */
   onTimeMachine?: () => void;
+  onTravel?: () => void;
 }) {
   const menu = h(
     'div',
@@ -77,7 +188,15 @@ export function createPauseDialog(actions: {
       'Resume',
     ),
     h('button', { type: 'button', class: 'retro-option', onclick: actions.onSettings }, 'Settings'),
+    actions.onTravel
+      ? h(
+          'button',
+          { type: 'button', class: 'retro-option', onclick: actions.onTravel },
+          'Quick travel',
+        )
+      : null,
     h('button', { type: 'button', class: 'retro-option', onclick: actions.onHelp }, 'Controls'),
+    h('a', { class: 'retro-option', href: '/classic.html' }, 'Switch to classic view (no 3D)'),
     actions.onTimeMachine
       ? h(
           'button',
@@ -206,7 +325,11 @@ export function createSettingsDialog(store: SettingsStore) {
       select('textScale', 'Text size', TEXT_SCALES, (v) => `${Math.round(v * 100)}%`),
       checkbox('readableFont', 'Use a plain, readable font everywhere'),
       checkbox('highContrast', 'High contrast menus'),
+      select('statusColors', 'Status colors', STATUS_PALETTES, (v) =>
+        v === 'standard' ? 'Standard (red and green)' : 'Colorblind-safe (orange and blue)',
+      ),
     ),
+    controlsFieldset(store, syncers),
     h(
       'fieldset',
       {},
@@ -249,10 +372,10 @@ export function createMenus(
   store: SettingsStore,
   dialogs: DialogStack,
   mount: HTMLElement,
-  extras: { onTimeMachine?: () => void } = {},
+  extras: { onTimeMachine?: () => void; onTravel?: () => void } = {},
 ) {
   const settings = createSettingsDialog(store);
-  const help = createHelpDialog();
+  const help = createHelpDialog(store);
   const pause = createPauseDialog({
     onSettings: () => dialogs.open(settings),
     onHelp: () => dialogs.open(help),

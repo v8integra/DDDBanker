@@ -101,8 +101,24 @@ export class SecurityGate {
     this.arms[1]!.rotation.y = this.openness * OPEN_ANGLE - wobble;
   }
 
+  private palette: 'standard' | 'colorblind' = 'standard';
+
+  /** Colorblind-safe lights swap red/green for orange/blue. The sign's icon and words already say it. */
+  setPalette(palette: 'standard' | 'colorblind') {
+    if (palette === this.palette) return;
+    this.palette = palette;
+    this.apply();
+  }
+
   private apply() {
-    const color = this.locked ? ip.gateLocked : ip.gateOpen;
+    const safe = this.palette === 'colorblind';
+    const color = this.locked
+      ? safe
+        ? ip.gateLockedSafe
+        : ip.gateLocked
+      : safe
+        ? ip.gateOpenSafe
+        : ip.gateOpen;
     for (const light of this.lights) light.material = toon(color, { emissive: color });
     this.lockedSign.visible = this.locked;
     this.openSign.visible = !this.locked;

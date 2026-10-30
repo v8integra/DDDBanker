@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BINDINGS, applyDeadzone, isClick, keyboardMoveIntent } from './bindings';
+import {
+  DEFAULT_BINDINGS,
+  applyDeadzone,
+  canBind,
+  isClick,
+  keyboardMoveIntent,
+  rebind,
+  resolveBindings,
+} from './bindings';
 
 const intent = (...codes: string[]) => keyboardMoveIntent(new Set(codes), DEFAULT_BINDINGS);
 
@@ -40,5 +48,50 @@ describe('isClick', () => {
   it('treats movement or a long hold as a drag', () => {
     expect(isClick(down, { x: 120, y: 100, time: 150 })).toBe(false);
     expect(isClick(down, { x: 100, y: 100, time: 900 })).toBe(false);
+  });
+});
+
+describe('canBind', () => {
+  it('refuses system keys and the reserved Escape', () => {
+    expect(canBind('KeyQ')).toBe(true);
+    expect(canBind('Tab')).toBe(false);
+    expect(canBind('Escape')).toBe(false);
+    expect(canBind('')).toBe(false);
+  });
+});
+
+describe('resolveBindings', () => {
+  it('falls back to defaults for junk and unknown actions', () => {
+    expect(resolveBindings({})).toEqual(DEFAULT_BINDINGS);
+    const r = resolveBindings({ fly: ['KeyF'], forward: 'KeyI' as never, back: [] });
+    expect(r).toEqual(DEFAULT_BINDINGS);
+  });
+
+  it('applies overrides, drops bad codes, and keeps two keys at most', () => {
+    const r = resolveBindings({ forward: ['KeyI', 'Tab', 'KeyK', 'KeyL'] });
+    expect(r.forward).toEqual(['KeyI', 'KeyK']);
+  });
+
+  it('always keeps Escape on pause', () => {
+    expect(resolveBindings({ pause: ['KeyQ'] }).pause).toEqual(['Escape', 'KeyQ']);
+    expect(resolveBindings({ pause: ['Escape'] }).pause).toEqual(['Escape']);
+  });
+});
+
+describe('rebind', () => {
+  it('makes the new key primary and keeps the second key', () => {
+    const next = rebind(DEFAULT_BINDINGS, 'forward', 'KeyI');
+    expect(next.forward).toEqual(['KeyI', 'ArrowUp']);
+    const again = rebind(resolveBindings(next), 'forward', 'KeyO');
+    expect(again.forward).toEqual(['KeyO', 'ArrowUp']);
+    const single = rebind(DEFAULT_BINDINGS, 'travel', 'KeyG');
+    expect(single.travel).toEqual(['KeyG']);
+  });
+
+  it('takes the key away from any other action so keys are never shared', () => {
+    const next = rebind(DEFAULT_BINDINGS, 'travel', 'KeyE');
+    expect(next.travel[0]).toBe('KeyE');
+    expect(next.interact).toEqual(['Enter']);
+    expect(resolveBindings(next).pause).toEqual(['Escape', 'KeyP']);
   });
 });

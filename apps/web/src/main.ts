@@ -21,6 +21,7 @@ function applyDocumentSettings(s: Settings) {
   root.dataset.readableFont = String(s.readableFont);
   root.dataset.contrast = s.highContrast ? 'high' : 'normal';
   root.dataset.reducedMotion = String(s.reducedMotion);
+  root.dataset.statusColors = s.statusColors;
 }
 
 /** Wait briefly for web fonts so canvas-drawn signs use them; never block for long. */

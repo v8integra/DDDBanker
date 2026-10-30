@@ -258,10 +258,12 @@ kbd {
   background: rgba(255, 255, 255, 0.08);
   outline: none;
 }
-/* The blinking ▶ cursor next to the selected option. */
+/* The blinking ▶ cursor next to the selected option. The empty alt text
+   keeps it out of the button's name, so screen readers just say the option. */
 .retro-option:hover::before,
 .retro-option:focus::before {
   content: '▶';
+  content: '▶' / '';
   position: absolute;
   left: 12px;
   color: var(--accent);
@@ -762,4 +764,72 @@ legend {
 .retro-table .cell--end,
 .retro-table .money {
   white-space: nowrap;
+}
+
+/* ---------- Phase 7: accessibility ---------- */
+/* Colorblind-safe status colors (Okabe–Ito). Signs and icons always accompany color. */
+:root[data-status-colors='colorblind'] {
+  --credit: #56b4e9;
+  --debit: #e69f00;
+  --error: #f0a830;
+}
+:root[data-status-colors='colorblind'][data-contrast='high'] {
+  --credit: #7cc8ff;
+  --debit: #ffb000;
+  --error: #ffc04d;
+}
+
+.keybind {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.keybind__keys {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.keybind__change {
+  min-height: 36px;
+  min-width: 88px;
+  padding: 4px 10px;
+  border: 2px solid var(--window-border);
+  border-radius: 8px;
+  background: var(--window-bg-2);
+  color: var(--window-text);
+  font: 700 0.9rem var(--font-body);
+  cursor: pointer;
+}
+
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: -100px;
+  z-index: 20;
+  padding: 10px 16px;
+  border: 3px solid var(--window-border);
+  border-radius: 10px;
+  background: var(--window-bg);
+  color: var(--window-text);
+  font-weight: 700;
+}
+.skip-link:focus {
+  top: 12px;
+}
+.hud-link {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 3px solid var(--window-border);
+  border-radius: 10px;
+  background: var(--window-bg);
+  color: var(--window-text);
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 3px 0 var(--window-shadow);
 }

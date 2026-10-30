@@ -23,7 +23,13 @@ const settingsSchema = (d: Settings) =>
       .string()
       .regex(/^#[0-9a-f]{6}$/i)
       .catch(d.playerColor),
+    statusColors: z.enum(STATUS_PALETTES).catch(d.statusColors),
+    /** Key overrides per action (see engine/bindings resolveBindings). */
+    keyBindings: z.record(z.string(), z.array(z.string()).max(3)).catch(d.keyBindings),
   });
+
+/** Status colors: standard red/green, or a colorblind-safe orange/blue. Icons and words always accompany them. */
+export const STATUS_PALETTES = ['standard', 'colorblind'] as const;
 
 export interface Settings {
   cameraSensitivity: number;
@@ -36,6 +42,8 @@ export interface Settings {
   highContrast: boolean;
   graphics: (typeof GRAPHICS_QUALITIES)[number];
   playerColor: string;
+  statusColors: (typeof STATUS_PALETTES)[number];
+  keyBindings: Record<string, string[]>;
 }
 
 export interface Environment {
@@ -57,6 +65,8 @@ export function defaultSettings(env: Environment): Settings {
     highContrast: env.prefersMoreContrast,
     graphics: env.lowPowerDevice ? 'low' : 'medium',
     playerColor: playerColors[0]!,
+    statusColors: 'standard',
+    keyBindings: {},
   };
 }
 

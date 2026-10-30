@@ -50,6 +50,20 @@ describe('parseSettings', () => {
     expect(parseSettings({ textScale: 3 }, defaults).textScale).toBe(1);
   });
 
+  it('validates status colors and key bindings', () => {
+    expect(defaults.statusColors).toBe('standard');
+    expect(defaults.keyBindings).toEqual({});
+    const ok = parseSettings(
+      { statusColors: 'colorblind', keyBindings: { forward: ['KeyI'] } },
+      defaults,
+    );
+    expect(ok.statusColors).toBe('colorblind');
+    expect(ok.keyBindings).toEqual({ forward: ['KeyI'] });
+    const bad = parseSettings({ statusColors: 'pink', keyBindings: 'wasd' }, defaults);
+    expect(bad.statusColors).toBe('standard');
+    expect(bad.keyBindings).toEqual({});
+  });
+
   it('handles junk', () => {
     expect(parseSettings(null, defaults)).toEqual(defaults);
     expect(parseSettings('nope', defaults)).toEqual(defaults);

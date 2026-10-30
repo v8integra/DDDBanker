@@ -17,6 +17,13 @@ export interface ExteriorHooks {
 
 export const EXTERIOR_SPAWN = { ...layout.spawn, y: layout.sidewalkHeight };
 /** Where you stand after walking out of the bank: on the steps, facing the street. */
+/** Standing at the outdoor ATM (quick travel). */
+export const ATM_SPOT = {
+  x: 5.3,
+  y: layout.sidewalkHeight,
+  z: layout.bank.frontZ - 1.0,
+  facing: 0,
+};
 export const BANK_EXIT_SPAWN = { x: 0, y: layout.sidewalkHeight, z: 1.8, facing: Math.PI };
 
 /** Level 1: the block outside the bank. */

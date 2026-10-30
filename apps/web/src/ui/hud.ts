@@ -15,7 +15,12 @@ export class Hud {
   private readonly bell: HTMLButtonElement;
   private readonly badge: HTMLElement;
 
-  constructor(handlers: { onMenu: () => void; onHelp: () => void; onBell: () => void }) {
+  constructor(handlers: {
+    onMenu: () => void;
+    onHelp: () => void;
+    onBell: () => void;
+    onTravel: () => void;
+  }) {
     this.badge = h('span', { class: 'hud-button__badge', 'aria-hidden': 'true', hidden: true });
     this.bell = h(
       'button',
@@ -75,6 +80,18 @@ export class Hud {
         h(
           'div',
           { class: 'hud-buttons' },
+          h('a', { class: 'hud-link', href: '/classic.html' }, 'Classic view'),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'hud-button',
+              onclick: handlers.onTravel,
+              'aria-label': 'Quick travel',
+              title: 'Quick travel (T)',
+            },
+            '📍',
+          ),
           this.bell,
           h(
             'button',

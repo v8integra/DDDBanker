@@ -82,6 +82,9 @@ export const interiorPalette = {
   gateGlass: '#bfe3f2',
   gateLocked: '#e05d4f',
   gateOpen: '#4caf6a',
+  /** Okabe–Ito orange and sky blue: tell apart for most kinds of color blindness. */
+  gateLockedSafe: '#e69f00',
+  gateOpenSafe: '#56b4e9',
   board: '#2f6f4f',
 };
 

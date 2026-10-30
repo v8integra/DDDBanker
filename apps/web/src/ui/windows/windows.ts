@@ -88,10 +88,11 @@ export class Windows {
   dialogue<T extends string = 'ok'>(options: DialogueOptions<T>): Promise<T | null> {
     const choices = options.choices ?? [{ value: 'ok' as T, label: 'Okay' }];
     const titleId = uid('dialogue');
+    const spokenId = uid('dialogue-text');
     const visible = options.lines.map(() => h('p', { 'aria-hidden': 'true' }));
     const spoken = h(
       'div',
-      { class: 'visually-hidden' },
+      { class: 'visually-hidden', id: spokenId },
       ...options.lines.map((line) => h('p', {}, line)),
     );
     const text = h('div', { class: 'dialogue-box__text' }, spoken, ...visible);
@@ -101,7 +102,12 @@ export class Windows {
       const menu = this.optionButtons(choices, settle);
       const dialog = h(
         'dialog',
-        { class: 'retro-window dialogue-box', 'aria-labelledby': titleId },
+        {
+          class: 'retro-window dialogue-box',
+          'aria-labelledby': titleId,
+          // Screen readers read the whole line on open, not the typing.
+          'aria-describedby': spokenId,
+        },
         h(
           'div',
           { class: 'dialogue-box__speaker' },

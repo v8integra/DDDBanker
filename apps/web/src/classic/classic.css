@@ -1,0 +1,193 @@
+/*
+ * Classic view: a normal, scrolling page in the bank's colors. Built on the
+ * same tokens as the 3D UI so text size, contrast, fonts and status colors
+ * all follow the same settings.
+ */
+html,
+body.classic {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+}
+body.classic {
+  --page-bg: #fbf3e0;
+  --page-text: #1d2433;
+  --page-muted: #4a5164;
+  --card-bg: #ffffff;
+  --card-border: #2f6f4f;
+  background: var(--page-bg);
+  color: var(--page-text);
+  font-family: var(--font-body);
+  line-height: 1.5;
+}
+:root[data-contrast='high'] body.classic {
+  --page-bg: #000;
+  --page-text: #fff;
+  --page-muted: #fff;
+  --card-bg: #000;
+  --card-border: #fff;
+}
+/* Money tones need dark-on-light versions here. */
+body.classic .money--credit {
+  color: #1d6b3f;
+}
+body.classic .money--debit {
+  color: #a3271c;
+}
+:root[data-status-colors='colorblind'] body.classic .money--credit {
+  color: #005a8c;
+}
+:root[data-status-colors='colorblind'] body.classic .money--debit {
+  color: #8a5500;
+}
+:root[data-contrast='high'] body.classic .money--credit,
+:root[data-contrast='high'] body.classic .money--debit {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.classic-header,
+#main,
+.classic-footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.classic-header__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.classic-header h1 {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 1.4rem;
+  font-weight: 400;
+  color: var(--card-border);
+}
+body.classic .notice {
+  color: var(--page-text);
+  border-color: #b07a12;
+  background: #fff4d6;
+}
+:root[data-contrast='high'] body.classic .notice {
+  background: #000;
+  border-color: #fff;
+}
+.classic-status {
+  font-weight: 700;
+  margin: 8px 0;
+}
+.classic-actions,
+.classic-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.classic-link {
+  color: var(--card-border);
+  font-weight: 700;
+}
+.classic-button {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 3px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card-border);
+  color: #fff;
+  font: 700 1rem var(--font-body);
+  cursor: pointer;
+}
+.classic-button--quiet {
+  background: transparent;
+  color: var(--page-text);
+}
+:root[data-contrast='high'] .classic-button {
+  background: #000;
+  color: #fff;
+}
+
+.classic-section {
+  margin: 24px 0;
+}
+.classic-section h2 {
+  font-size: 1.25rem;
+  margin: 0 0 12px;
+}
+.classic-note {
+  color: var(--page-muted);
+  font-size: 0.95rem;
+}
+#main:focus {
+  outline: none;
+}
+
+.classic-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.classic-table th,
+.classic-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #d8cdb5;
+  text-align: left;
+}
+.classic-table thead th {
+  background: var(--card-border);
+  color: #fff;
+}
+.classic-table .cell--end {
+  text-align: right;
+}
+
+.classic-stations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.classic-station {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto 1fr;
+  column-gap: 10px;
+  padding: 12px 14px;
+  border: 2px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--page-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.classic-station:hover,
+.classic-station:focus-visible {
+  box-shadow: 0 0 0 3px var(--focus);
+}
+.classic-station[aria-disabled='true'] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.classic-station__icon {
+  grid-row: 1 / span 3;
+  font-size: 1.6rem;
+}
+.classic-station__title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.classic-station__who,
+.classic-station__services {
+  color: var(--page-muted);
+  font-size: 0.9rem;
+}

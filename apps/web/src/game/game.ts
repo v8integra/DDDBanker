@@ -3,10 +3,11 @@ import type { ApiClient } from '../api/client';
 import type { SessionWatcher } from '../auth/sessionWatcher';
 import { FollowCamera } from '../camera/followCamera';
 import { DEBUG, DebugOverlay } from '../debug/debug';
+import { resolveBindings } from '../engine/bindings';
 import { Input } from '../engine/input';
 import { applyQuality, resizeToDisplay } from '../engine/renderer';
 import { pickInteractable, type Interactable } from '../interaction/interactables';
-import { BANK_EXIT_SPAWN, buildExteriorLevel } from '../levels/exterior';
+import { ATM_SPOT, BANK_EXIT_SPAWN, EXTERIOR_SPAWN, buildExteriorLevel } from '../levels/exterior';
 import { INTERIOR_ARRIVAL, LOBBY_RETURN, buildInteriorLevel } from '../levels/interior';
 import type { Level, Spawn } from '../levels/level';
 import { Character } from '../player/character';
@@ -17,6 +18,7 @@ import { timeMachine } from '../stations/banking/dev';
 import { notificationsWindow } from '../stations/banking/help';
 import type { BankContext } from '../stations/banking/kit';
 import { infoBoardLines, runStation } from '../stations/handlers';
+import { STATIONS, stationSpot } from '../stations/stations';
 import { interior } from '../theme';
 import { DialogStack } from '../ui/dialogs';
 import { installMenuKeys } from '../ui/windows/menuKeys';
@@ -74,16 +76,18 @@ export class Game {
   ) {
     this.character = new Character({ color: store.get().playerColor });
     this.input = new Input(canvas);
-    const menus = createMenus(
-      store,
-      this.dialogs,
-      uiRoot,
-      DEBUG ? { onTimeMachine: () => void timeMachine(this.bank) } : {},
-    );
+    const menus = createMenus(store, this.dialogs, uiRoot, {
+      onTravel: () => {
+        this.dialogs.closeAll(); // leave the pause menu, then pick a place
+        void this.quickTravel();
+      },
+      ...(DEBUG ? { onTimeMachine: () => void timeMachine(this.bank) } : {}),
+    });
     this.hud = new Hud({
       onMenu: menus.openPause,
       onHelp: menus.openHelp,
       onBell: () => void notificationsWindow(this.bank),
+      onTravel: () => void this.quickTravel(),
     });
     uiRoot.prepend(this.hud.root);
     this.prompt = new InteractPrompt(
@@ -133,6 +137,7 @@ export class Game {
     this.interiorReady.then((parts) => {
       this.interiorParts = parts;
       parts.gate.setLocked(!this.watcher.signedIn);
+      parts.gate.setPalette(this.store.get().statusColors);
       applyQuality(this.renderer, parts.level.sun, this.store.get().graphics);
     });
 
@@ -144,6 +149,8 @@ export class Game {
       }
       if (s.playerColor !== prev.playerColor) this.character.setColor(s.playerColor);
       if (!s.clickToMove) this.active.player.setWalkTarget(null);
+      this.input.bindings = resolveBindings(s.keyBindings);
+      this.interiorParts?.gate.setPalette(s.statusColors);
     });
 
     this.watcher.subscribe((change, session) => {
@@ -208,6 +215,7 @@ export class Game {
 
     if (input.click && settings.clickToMove && !this.busy) this.handleClick(input.click);
     if (input.pressed.has('interact') && !this.busy) this.interact(this.prompt.target);
+    if (input.pressed.has('travel') && !this.busy) void this.quickTravel();
 
     const before = level.player.position.clone();
     level.player.update(dt, input, level.follow.yaw);
@@ -316,6 +324,77 @@ export class Game {
       BANK_EXIT_SPAWN,
       Math.PI,
     );
+  }
+
+  /**
+   * Quick travel: jump to any place or desk without walking (the 3D world is
+   * never required). Choosing a desk opens its menu right away.
+   */
+  private async quickTravel() {
+    if (this.busy) return;
+    const inside = await this.interiorReady;
+    const locked = inside.gate.isLocked;
+    const pick = await this.ui.options<string>({
+      title: 'Quick Travel',
+      text: ['Go straight to any place in the bank. Choosing a desk opens its menu.'],
+      choices: [
+        { value: 'street', label: '🌳 Bramblewood Street', hint: 'Outside the bank' },
+        { value: 'atm', label: '🏧 Outdoor ATM', hint: 'Outside, next to the front door' },
+        { value: 'lobby', label: '🚪 Lobby', hint: 'Just inside the front door' },
+        ...STATIONS.map((def) => ({
+          value: def.id,
+          label: `${def.icon} ${def.title}`,
+          hint: [
+            def.staff?.name,
+            def.area === 'hall'
+              ? locked
+                ? 'Banking hall (check in first)'
+                : 'Banking hall'
+              : 'Lobby',
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        })),
+      ],
+    });
+    if (!pick) return;
+
+    if (pick === 'street') return this.travel(this.exterior.level, EXTERIOR_SPAWN, 0);
+    if (pick === 'atm') {
+      await this.travel(this.exterior.level, ATM_SPOT, 0);
+      return useAtm(this.bank);
+    }
+    if (pick === 'lobby') return this.travel(inside.level, INTERIOR_ARRIVAL, 0);
+
+    let station = inside.stations.find((s) => s.def.id === pick);
+    if (station?.def.area === 'hall' && inside.gate.isLocked) {
+      const go = await this.ui.confirm({
+        title: 'Check In First',
+        text: [
+          'The banking hall is behind the security gate. Pip at the Check-In desk can let you through.',
+        ],
+        confirmLabel: 'Take me to Check-In',
+        cancelLabel: 'Never mind',
+      });
+      if (!go) return;
+      station = inside.stations.find((s) => s.def.id === 'checkin');
+    }
+    if (!station) return;
+    const spot = stationSpot(station.def);
+    const facing = station.def.facing + Math.PI; // face the desk
+    await this.travel(inside.level, { x: spot.x, y: 0, z: spot.z, facing }, facing);
+    await this.talkTo(station);
+  }
+
+  /** Fade, move (changing scene if needed), fade back. */
+  private async travel(level: Level, spawn: Spawn, cameraYaw: number) {
+    const reduced = this.store.get().reducedMotion;
+    this.setBusy(true);
+    await this.fade.to(1, FADE_MS, reduced);
+    this.activate(level, spawn, cameraYaw);
+    this.renderNow();
+    await this.fade.to(0, FADE_MS, reduced);
+    this.setBusy(false);
   }
 
   private bumpGate() {
